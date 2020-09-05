@@ -1,0 +1,7 @@
+#ifndef _DO_KALMAN_H_
+#define _DO_KALMAN_H_
+#include "KalmanFilter.h"
+
+KalmanFilter kalmanX(0.001, 0.003, 0.03);
+
+#endif
