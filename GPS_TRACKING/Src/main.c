@@ -114,18 +114,18 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
 
-	while (MPU6050_Init(&hi2c1, MPU6050_DataRate_1KHz, MPU6050_Accelerometer_2G,
-			MPU6050_Gyroscope_500s) != MPU6050_Result_Ok) {
-		HAL_Delay(100);
-	}
-	while (!HMC5883L_initialize()) {
-		HAL_Delay(100);
-	}
-
-	setRange(HMC5883L_RANGE_1_3GA); //HMC5883L_RANGE_8_1GA
-	setMeasurementMode(HMC5883L_CONTINOUS);
-	setDataRate(HMC5883L_DATARATE_75HZ);
-	setSamples(HMC5883L_SAMPLES_8);
+//	while (MPU6050_Init(&hi2c1, MPU6050_DataRate_1KHz, MPU6050_Accelerometer_2G,
+//			MPU6050_Gyroscope_500s) != MPU6050_Result_Ok) {
+//		HAL_Delay(100);
+//	}
+//	while (!HMC5883L_initialize()) {
+//		HAL_Delay(100);
+//	}
+//
+//	setRange(HMC5883L_RANGE_1_3GA); //HMC5883L_RANGE_8_1GA
+//	setMeasurementMode(HMC5883L_CONTINOUS);
+//	setDataRate(HMC5883L_DATARATE_75HZ);
+//	setSamples(HMC5883L_SAMPLES_8);
 	//setOffset(0, 0);
 
 	HAL_TIM_Encoder_Start(&htim1, TIM_CHANNEL_1 | TIM_CHANNEL_2);

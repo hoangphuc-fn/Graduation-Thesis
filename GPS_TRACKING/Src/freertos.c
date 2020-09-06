@@ -54,6 +54,10 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+char strO[50]="";
+char strLat[50]="";
+char strLon[50]="";
+
 /* For GPS */
 double realLat = 0;
 double realLon = 0;
@@ -114,18 +118,19 @@ void resetArray(char pArr[], uint8_t length);
 void resetArray(char pArr[], uint8_t length);
 /* USER CODE END FunctionPrototypes */
 
-void StartDefaultTask(void const * argument);
-void StartLcdTask(void const * argument);
-void StartUartGPS(void const * argument);
-void StartGpsTask(void const * argument);
-void StartMPUTask(void const * argument);
-void StartUartESP(void const * argument);
-void StartMotorTask(void const * argument);
+void StartDefaultTask(void const *argument);
+void StartLcdTask(void const *argument);
+void StartUartGPS(void const *argument);
+void StartGpsTask(void const *argument);
+void StartMPUTask(void const *argument);
+void StartUartESP(void const *argument);
+void StartMotorTask(void const *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
 /* GetIdleTaskMemory prototype (linked to static allocation support) */
-void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize );
+void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer,
+		StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize);
 
 /* Hook prototypes */
 void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName);
@@ -156,72 +161,72 @@ void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer,
 /* USER CODE END GET_IDLE_TASK_MEMORY */
 
 /**
-  * @brief  FreeRTOS initialization
-  * @param  None
-  * @retval None
-  */
+ * @brief  FreeRTOS initialization
+ * @param  None
+ * @retval None
+ */
 void MX_FREERTOS_Init(void) {
-  /* USER CODE BEGIN Init */
+	/* USER CODE BEGIN Init */
 
-  /* USER CODE END Init */
-  /* Create the mutex(es) */
-  /* definition and creation of gpsDataMutex */
-  osMutexDef(gpsDataMutex);
-  gpsDataMutexHandle = osMutexCreate(osMutex(gpsDataMutex));
+	/* USER CODE END Init */
+	/* Create the mutex(es) */
+	/* definition and creation of gpsDataMutex */
+	osMutexDef(gpsDataMutex);
+	gpsDataMutexHandle = osMutexCreate(osMutex(gpsDataMutex));
 
-  /* USER CODE BEGIN RTOS_MUTEX */
+	/* USER CODE BEGIN RTOS_MUTEX */
 	/* add mutexes, ... */
-  /* USER CODE END RTOS_MUTEX */
+	/* USER CODE END RTOS_MUTEX */
 
-  /* Create the semaphores(s) */
-  /* definition and creation of gpsDataSem */
-  osSemaphoreDef(gpsDataSem);
-  gpsDataSemHandle = osSemaphoreCreate(osSemaphore(gpsDataSem), 1);
+	/* Create the semaphores(s) */
+	/* definition and creation of gpsDataSem */
+	osSemaphoreDef(gpsDataSem);
+	gpsDataSemHandle = osSemaphoreCreate(osSemaphore(gpsDataSem), 1);
 
-  /* USER CODE BEGIN RTOS_SEMAPHORES */
+	/* USER CODE BEGIN RTOS_SEMAPHORES */
 	/* add semaphores, ... */
-  /* USER CODE END RTOS_SEMAPHORES */
+	/* USER CODE END RTOS_SEMAPHORES */
 
-  /* USER CODE BEGIN RTOS_TIMERS */
+	/* USER CODE BEGIN RTOS_TIMERS */
 	/* start timers, add new ones, ... */
-  /* USER CODE END RTOS_TIMERS */
+	/* USER CODE END RTOS_TIMERS */
 
-  /* USER CODE BEGIN RTOS_QUEUES */
+	/* USER CODE BEGIN RTOS_QUEUES */
 	/* add queues, ... */
-  /* USER CODE END RTOS_QUEUES */
+	/* USER CODE END RTOS_QUEUES */
 
-  /* Create the thread(s) */
-  /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
-  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+	/* Create the thread(s) */
+	/* definition and creation of defaultTask */
+	osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
+	defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
-  /* definition and creation of lcdTask */
-  osThreadDef(lcdTask, StartLcdTask, osPriorityIdle, 0, 128);
-  lcdTaskHandle = osThreadCreate(osThread(lcdTask), NULL);
+	/* definition and creation of lcdTask */
+	osThreadDef(lcdTask, StartLcdTask, osPriorityIdle, 0, 128);
+	lcdTaskHandle = osThreadCreate(osThread(lcdTask), NULL);
 
-  /* definition and creation of uartGPS */
-  osThreadDef(uartGPS, StartUartGPS, osPriorityNormal, 0, 128);
-  uartGPSHandle = osThreadCreate(osThread(uartGPS), NULL);
+	/* definition and creation of uartGPS */
+	osThreadDef(uartGPS, StartUartGPS, osPriorityNormal, 0, 128);
+	uartGPSHandle = osThreadCreate(osThread(uartGPS), NULL);
 
-  /* definition and creation of gpsTask */
-  osThreadDef(gpsTask, StartGpsTask, osPriorityIdle, 0, 200);
-  gpsTaskHandle = osThreadCreate(osThread(gpsTask), NULL);
+	/* definition and creation of gpsTask */
+	osThreadDef(gpsTask, StartGpsTask, osPriorityIdle, 0, 200);
+	gpsTaskHandle = osThreadCreate(osThread(gpsTask), NULL);
 
-  /* definition and creation of mpuTask */
-  osThreadDef(mpuTask, StartMPUTask, osPriorityNormal, 0, 200);
-  mpuTaskHandle = osThreadCreate(osThread(mpuTask), NULL);
+	/* definition and creation of mpuTask */
+	osThreadDef(mpuTask, StartMPUTask, osPriorityNormal, 0, 200);
+	mpuTaskHandle = osThreadCreate(osThread(mpuTask), NULL);
 
-  /* definition and creation of uartESP */
-  osThreadDef(uartESP, StartUartESP, osPriorityIdle, 0, 200);
-  uartESPHandle = osThreadCreate(osThread(uartESP), NULL);
+	/* definition and creation of uartESP */
+	osThreadDef(uartESP, StartUartESP, osPriorityIdle, 0, 200);
+	uartESPHandle = osThreadCreate(osThread(uartESP), NULL);
 
-  /* definition and creation of motorTask */
-  osThreadDef(motorTask, StartMotorTask, osPriorityIdle, 0, 128);
-  motorTaskHandle = osThreadCreate(osThread(motorTask), NULL);
+	/* definition and creation of motorTask */
+	osThreadDef(motorTask, StartMotorTask, osPriorityIdle, 0, 128);
+	motorTaskHandle = osThreadCreate(osThread(motorTask), NULL);
 
-  /* USER CODE BEGIN RTOS_THREADS */
+	/* USER CODE BEGIN RTOS_THREADS */
 	/* add threads, ... */
-  /* USER CODE END RTOS_THREADS */
+	/* USER CODE END RTOS_THREADS */
 
 }
 
@@ -232,9 +237,8 @@ void MX_FREERTOS_Init(void) {
  * @retval None
  */
 /* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void const * argument)
-{
-  /* USER CODE BEGIN StartDefaultTask */
+void StartDefaultTask(void const *argument) {
+	/* USER CODE BEGIN StartDefaultTask */
 	uint32_t time_until;
 	uint8_t time_sample = 1;
 	/* Infinite loop */
@@ -244,7 +248,7 @@ void StartDefaultTask(void const * argument)
 //			speed_run(FRONT_RIGHT, -500);
 			speed_run(BACK_LEFT, 200);
 			speed_run(BACK_RIGHT, 1000);
-		}else{
+		} else {
 			speed_run(FRONT_LEFT, -00);
 			speed_run(FRONT_RIGHT, -00);
 			speed_run(BACK_LEFT, -0);
@@ -253,7 +257,7 @@ void StartDefaultTask(void const * argument)
 		//HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_15| GPIO_PIN_13|GPIO_PIN_14| GPIO_PIN_12);
 		osDelayUntil(&time_until, 200);
 	}
-  /* USER CODE END StartDefaultTask */
+	/* USER CODE END StartDefaultTask */
 }
 
 /* USER CODE BEGIN Header_StartLcdTask */
@@ -263,20 +267,21 @@ void StartDefaultTask(void const * argument)
  * @retval None
  */
 /* USER CODE END Header_StartLcdTask */
-void StartLcdTask(void const * argument)
-{
-  /* USER CODE BEGIN StartLcdTask */
+void StartLcdTask(void const *argument) {
+	/* USER CODE BEGIN StartLcdTask */
 	delay_init();
 	ST7920_Init();
 	ST7920_Clear();
 	/* Infinite loop */
 	for (;;) {
+		ST7920_SendString(0, 0, strO);
 		ST7920_SendString(1, 0, "HoangPhuc");
-		HAL_Delay(1000);
-		ST7920_SendString(2, 0, "Quynh Giao");
-		osDelay(100);
+		//HAL_Delay(1000);
+		ST7920_SendString(2, 0, strLat);
+		ST7920_SendString(3, 0, strLon);
+		osDelay(10);
 	}
-  /* USER CODE END StartLcdTask */
+	/* USER CODE END StartLcdTask */
 }
 
 /* USER CODE BEGIN Header_StartUartGPS */
@@ -286,9 +291,8 @@ void StartLcdTask(void const * argument)
  * @retval None
  */
 /* USER CODE END Header_StartUartGPS */
-void StartUartGPS(void const * argument)
-{
-  /* USER CODE BEGIN StartUartGPS */
+void StartUartGPS(void const *argument) {
+	/* USER CODE BEGIN StartUartGPS */
 	uint8_t cnt = 0;
 	HAL_UART_Receive_IT(&huart4, &C, 1);
 	/* Infinite loop */
@@ -299,6 +303,7 @@ void StartUartGPS(void const * argument)
 		if (gpsData[cnt - 1] == '\n') {
 			if (strstr(gpsData, "GNGGA") != NULL) {
 				hehe++;
+				sprintf(strO,"count: %d",hehe);
 				osSemaphoreRelease(gpsDataSemHandle);
 			} else {
 				resetArray(gpsData, strlen(gpsData));
@@ -307,7 +312,7 @@ void StartUartGPS(void const * argument)
 		}
 		HAL_UART_Receive_IT(&huart4, &C, 1);
 	}
-  /* USER CODE END StartUartGPS */
+	/* USER CODE END StartUartGPS */
 }
 
 /* USER CODE BEGIN Header_StartGpsTask */
@@ -317,9 +322,8 @@ void StartUartGPS(void const * argument)
  * @retval None
  */
 /* USER CODE END Header_StartGpsTask */
-void StartGpsTask(void const * argument)
-{
-  /* USER CODE BEGIN StartGpsTask */
+void StartGpsTask(void const *argument) {
+	/* USER CODE BEGIN StartGpsTask */
 	char tempStr[100];
 	/* Infinite loop */
 	for (;;) {
@@ -329,10 +333,12 @@ void StartGpsTask(void const * argument)
 		resetArray(gpsData, strlen(gpsData));
 		if (getCoordinates(tempStr, &realLat, &realLon)) {
 			HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_15);
+			sprintf(strLat, "%d.%d",(int)realLat, (int)(realLat*1000000)%10000000);
+			sprintf(strLon, "%d.%d",(int)realLon, (int)(realLon*1000000)%106000000);
 		}
 		osDelay(1);
 	}
-  /* USER CODE END StartGpsTask */
+	/* USER CODE END StartGpsTask */
 }
 
 /* USER CODE BEGIN Header_StartMPUTask */
@@ -342,11 +348,24 @@ void StartGpsTask(void const * argument)
  * @retval None
  */
 /* USER CODE END Header_StartMPUTask */
-void StartMPUTask(void const * argument)
-{
-  /* USER CODE BEGIN StartMPUTask */
+void StartMPUTask(void const *argument) {
+	/* USER CODE BEGIN StartMPUTask */
 	uint32_t time_until;
 	uint8_t time_sample = 5;
+
+	while (MPU6050_Init(&hi2c1, MPU6050_DataRate_1KHz, MPU6050_Accelerometer_2G,
+			MPU6050_Gyroscope_500s) != MPU6050_Result_Ok) {
+		HAL_Delay(100);
+	}
+	while (!HMC5883L_initialize()) {
+		HAL_Delay(100);
+	}
+
+	setRange(HMC5883L_RANGE_1_3GA); //HMC5883L_RANGE_8_1GA
+	setMeasurementMode(HMC5883L_CONTINOUS);
+	setDataRate(HMC5883L_DATARATE_75HZ);
+	setSamples(HMC5883L_SAMPLES_8);
+
 	MyKalman kalmanY = newKalman(0.001, 0.003, 0.03);
 	MyKalman kalmanX = newKalman(0.001, 0.003, 0.03);
 	/* Infinite loop */
@@ -401,7 +420,7 @@ void StartMPUTask(void const * argument)
 		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
 		osDelayUntil(&time_until, time_sample);
 	}
-  /* USER CODE END StartMPUTask */
+	/* USER CODE END StartMPUTask */
 }
 
 /* USER CODE BEGIN Header_StartUartESP */
@@ -411,9 +430,8 @@ void StartMPUTask(void const * argument)
  * @retval None
  */
 /* USER CODE END Header_StartUartESP */
-void StartUartESP(void const * argument)
-{
-  /* USER CODE BEGIN StartUartESP */
+void StartUartESP(void const *argument) {
+	/* USER CODE BEGIN StartUartESP */
 	uint32_t time_until;
 	/* Infinite loop */
 	for (;;) {
@@ -426,7 +444,7 @@ void StartUartESP(void const * argument)
 //		while(HAL_UART_GetState(&huart5)!= HAL_UART_STATE_BUSY_TX);
 		osDelayUntil(&time_until, 5);
 	}
-  /* USER CODE END StartUartESP */
+	/* USER CODE END StartUartESP */
 }
 
 /* USER CODE BEGIN Header_StartMotorTask */
@@ -436,9 +454,8 @@ void StartUartESP(void const * argument)
  * @retval None
  */
 /* USER CODE END Header_StartMotorTask */
-void StartMotorTask(void const * argument)
-{
-  /* USER CODE BEGIN StartMotorTask */
+void StartMotorTask(void const *argument) {
+	/* USER CODE BEGIN StartMotorTask */
 	uint32_t time_until;
 	uint8_t time_sample = 10;
 	uint8_t l_cntT = 0; /* counter variable to generate interrupt each 1s */
@@ -455,7 +472,7 @@ void StartMotorTask(void const * argument)
 		}
 		osDelayUntil(&time_until, time_sample);
 	}
-  /* USER CODE END StartMotorTask */
+	/* USER CODE END StartMotorTask */
 }
 
 /* Private application code --------------------------------------------------*/
