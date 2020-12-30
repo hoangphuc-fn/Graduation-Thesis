@@ -17,11 +17,44 @@ typedef enum{
 	FLOATING
 }Direction_Typedef;
 
-extern int32_t enc3;
-extern short l_enc3;				/* encoder value at now */
-extern short l_pre_enc3;			/* encoder value at 1s ago */
-extern int16_t l_cnt3;		/* revs of the value range */
+typedef struct pid{
+	float _kP;
+	float _kI;
+	float _kD;
+	int _input;
+	int _err;
+	int _preErr;
+	float _outP;
+	float _outI;
+	float _outD;
+	float _output;
+}PID;
+
+
+extern int32_t enc_FL;
+extern short l_enc_FL;				/* encoder value at now */
+extern short l_pre_enc_FL;			/* encoder value at 1s ago */
+extern int16_t l_cnt_FL;		/* revs of the value range */
+//--------
+extern int32_t enc_FR;
+extern short l_enc_FR;				/* encoder value at now */
+extern short l_pre_enc_FR;			/* encoder value at 1s ago */
+extern int16_t l_cnt_FR;		/* revs of the value range */
+//--------
+extern int32_t enc_BL;
+extern short l_enc_BL;				/* encoder value at now */
+extern short l_pre_enc_BL;			/* encoder value at 1s ago */
+extern int16_t l_cnt_BL;		/* revs of the value range */
+//--------
+extern int32_t enc_BR;
+extern short l_enc_BR;				/* encoder value at now */
+extern short l_pre_enc_BR;			/* encoder value at 1s ago */
+extern int16_t l_cnt_BR;		/* revs of the value range */
 
 void speed_run(Wheel_Typedef wheel, int16_t speed);
 void CountPulse(short l_enc, short l_pre_enc, short *l_cnt, int32_t* enc, TIM_HandleTypeDef* htim);
+
+PID newPID(float kP, float kI, float kD);
+void computePID(PID *A, int setPoint);
+
 #endif

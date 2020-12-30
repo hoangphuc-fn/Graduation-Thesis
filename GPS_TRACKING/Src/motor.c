@@ -1,9 +1,24 @@
 #include "motor.h"
 
-int32_t enc3 = 0;
-short l_enc3 = 0; /* encoder value at now */
-short l_pre_enc3 = 0; /* encoder value at 1s ago */
-int16_t l_cnt3 = 0; /* revs of the value range */
+int32_t enc_FL = 0;
+short l_enc_FL = 0; /* encoder value at now */
+short l_pre_enc_FL = 0; /* encoder value at 1s ago */
+int16_t l_cnt_FL = 0; /* revs of the value range */
+//---------
+int32_t enc_FR = 0;
+short l_enc_FR = 0; /* encoder value at now */
+short l_pre_enc_FR = 0; /* encoder value at 1s ago */
+int16_t l_cnt_FR = 0; /* revs of the value range */
+//---------
+int32_t enc_BL = 0;
+short l_enc_BL = 0; /* encoder value at now */
+short l_pre_enc_BL = 0; /* encoder value at 1s ago */
+int16_t l_cnt_BL = 0; /* revs of the value range */
+//---------
+int32_t enc_BR = 0;
+short l_enc_BR = 0; /* encoder value at now */
+short l_pre_enc_BR = 0; /* encoder value at 1s ago */
+int16_t l_cnt_BR = 0; /* revs of the value range */
 
 void speed_run(Wheel_Typedef wheel, int16_t speed) {
 	if (speed > 0 && speed <= 1000) { // FORWARD
@@ -52,7 +67,7 @@ void speed_run(Wheel_Typedef wheel, int16_t speed) {
 			__HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_4, -speed);
 			break;
 		}
-	} else if (speed == 0) {	// BRAKING
+	} else if (speed == 9999) {	// BRAKING
 		switch (wheel) {
 		case FRONT_LEFT:
 			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_8, GPIO_PIN_RESET);
@@ -71,7 +86,7 @@ void speed_run(Wheel_Typedef wheel, int16_t speed) {
 			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
 			break;
 		}
-	} else { // FLOATING
+	} else if (speed == 0) { // FLOATING
 		switch (wheel) {
 		case FRONT_LEFT:
 			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_8, GPIO_PIN_SET);
@@ -106,4 +121,33 @@ void CountPulse(short l_enc, short l_pre_enc, short *l_cnt, int32_t *enc,
 	}
 	/* The actual number of pulses from the encoder */
 	*enc = *l_cnt * 32768 + l_enc;
+}
+
+PID newPID(float kP, float kI, float kD){
+	PID A;
+	A._kP = kP;
+	A._kI = kI;
+	A._kD = kD;
+	A._input = 0;
+	A._err = 0;
+	A._preErr = 0;
+	A._outP = 0;
+	A._outI = 0;
+	A._outD = 0;
+	A._output = 0;
+	return A;
+}
+
+void computePID(PID *A, int setPoint){
+	A->_err = setPoint - A->_input;
+	A->_outP = A->_kP*A->_err;
+	A->_outI += (A->_kI*(A->_err+A->_preErr));
+	A->_outD = A->_kD*(A->_err-A->_preErr);
+	A->_output += (A->_outP+A->_outI+A->_outD);
+	if(A->_output >= 1000){
+		A->_output = 1000;
+	} else if(A->_output <= -1000){
+		A->_output = -1000;
+	}
+	A->_preErr = A->_err;
 }
