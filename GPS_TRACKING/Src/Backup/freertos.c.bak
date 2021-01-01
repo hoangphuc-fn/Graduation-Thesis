@@ -54,9 +54,15 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-char strO[50]="";
-char strLat[50]="";
-char strLon[50]="";
+char strO[50] = "";
+char lcdLine00[10] = "";
+char lcdLine01[10] = "";
+char lcdLine1[50] = "";
+char lcdLine2[50] = "";
+char lcdLine3[50] = "";
+char lcdLine4[50] = "";
+char strLat[50] = "";
+char strLon[50] = "";
 
 /* For GPS */
 double realLat = 0;
@@ -64,6 +70,7 @@ double realLon = 0;
 uint8_t C;
 char gpsData[100];
 uint64_t hehe = 0;
+uint16_t hihi = 0;
 bool isOverFlow = false;
 
 /* For MPU */
@@ -81,11 +88,22 @@ float accPitch = 0;
 float accRoll = 0;
 float kalPitch = 0;
 float kalRoll = 0;
+float yaw_gyro_deg = 0;
+bool initGyro = false;
+bool mapAngle = false;
+
+uint64_t sec = 0;
 
 /* For Encoder */
 short enc1 = 0;
 short enc2 = 0;
 short enc4 = 0;
+/* For PID */
+
+float O_pid;
+int setPoint;
+int8_t diff = 2;
+int16_t speed = 0;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -204,15 +222,15 @@ void MX_FREERTOS_Init(void) {
   lcdTaskHandle = osThreadCreate(osThread(lcdTask), NULL);
 
   /* definition and creation of uartGPS */
-  osThreadDef(uartGPS, StartUartGPS, osPriorityNormal, 0, 128);
+  osThreadDef(uartGPS, StartUartGPS, osPriorityRealtime, 0, 128);
   uartGPSHandle = osThreadCreate(osThread(uartGPS), NULL);
 
   /* definition and creation of gpsTask */
-  osThreadDef(gpsTask, StartGpsTask, osPriorityIdle, 0, 200);
+  osThreadDef(gpsTask, StartGpsTask, osPriorityRealtime, 0, 200);
   gpsTaskHandle = osThreadCreate(osThread(gpsTask), NULL);
 
   /* definition and creation of mpuTask */
-  osThreadDef(mpuTask, StartMPUTask, osPriorityNormal, 0, 200);
+  osThreadDef(mpuTask, StartMPUTask, osPriorityRealtime, 0, 250);
   mpuTaskHandle = osThreadCreate(osThread(mpuTask), NULL);
 
   /* definition and creation of uartESP */
@@ -220,7 +238,7 @@ void MX_FREERTOS_Init(void) {
   uartESPHandle = osThreadCreate(osThread(uartESP), NULL);
 
   /* definition and creation of motorTask */
-  osThreadDef(motorTask, StartMotorTask, osPriorityBelowNormal, 0, 128);
+  osThreadDef(motorTask, StartMotorTask, osPriorityIdle, 0, 128);
   motorTaskHandle = osThreadCreate(osThread(motorTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -240,28 +258,27 @@ void StartDefaultTask(void const * argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
 	uint32_t time_until;
-	uint8_t time_sample = 1;
+	uint8_t time_sample = 10;
+	uint8_t cnt = 0;
 	/* Infinite loop */
-	for (;;) {
-		if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == GPIO_PIN_RESET) {
-//			speed_run(FRONT_LEFT, 1000);
-//			HAL_Delay(1000);
-//			speed_run(FRONT_RIGHT, 500);
-//			speed_run(BACK_LEFT, -500);
-			speed_run(BACK_RIGHT, -300);
-		} else if(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_3) == GPIO_PIN_RESET ) {
-			speed_run(BACK_RIGHT, 300);
-			speed_run(FRONT_RIGHT, -500);
+	while (1) {
+		if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1) == GPIO_PIN_RESET) {
+			speed += 5;
+			HAL_Delay(300);
 		}
-
-//		else {
-//			speed_run(FRONT_LEFT, 0);
-//			speed_run(FRONT_RIGHT, 0);
-//			speed_run(BACK_LEFT, 0);
-//			speed_run(BACK_RIGHT, 00);
-//		}
-		//HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_15| GPIO_PIN_13|GPIO_PIN_14| GPIO_PIN_12);
-		osDelayUntil(&time_until, 200);
+		if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET) {
+			break;
+		}
+		osDelayUntil(&time_until, time_sample);
+	}
+	for (;;) {
+		run_straight(0, yaw_gyro_deg * 2.5, speed, 20);
+		cnt++;
+		if (cnt >= 100) {
+			hihi++;
+			cnt = 0;
+		}
+		osDelayUntil(&time_until, time_sample);
 	}
   /* USER CODE END StartDefaultTask */
 }
@@ -281,11 +298,16 @@ void StartLcdTask(void const * argument)
 	ST7920_Clear();
 	/* Infinite loop */
 	for (;;) {
-		ST7920_SendString(0, 0, strO);
-		ST7920_SendString(1, 0, "HoangPhuc");
-		//HAL_Delay(1000);
-		ST7920_SendString(2, 0, strLat);
-		ST7920_SendString(3, 0, strLon);
+		sprintf(lcdLine00, "H:%d  ", (int) headingDegrees2);
+		ST7920_SendString(0, 0, lcdLine00);
+		sprintf(lcdLine01, "A:%d  ", (int) yaw_gyro_deg);
+		ST7920_SendString(0, 3, lcdLine01);
+		sprintf(lcdLine1, "gyro[2]: %d ", (int) gyro_deg[2]);
+		ST7920_SendString(1, 0, lcdLine1);
+		sprintf(lcdLine2, "default: %d", hihi);
+		ST7920_SendString(2, 0, lcdLine2);
+		sprintf(lcdLine3, "speed: %d", speed);
+		ST7920_SendString(3, 0, lcdLine3);
 		osDelay(10);
 	}
   /* USER CODE END StartLcdTask */
@@ -311,7 +333,7 @@ void StartUartGPS(void const * argument)
 		if (gpsData[cnt - 1] == '\n') {
 			if (strstr(gpsData, "GNGGA") != NULL) {
 				hehe++;
-				sprintf(strO,"count: %d",hehe);
+				sprintf(strO, "count: %d", hehe);
 				osSemaphoreRelease(gpsDataSemHandle);
 			} else {
 				resetArray(gpsData, strlen(gpsData));
@@ -342,8 +364,10 @@ void StartGpsTask(void const * argument)
 		resetArray(gpsData, strlen(gpsData));
 		if (getCoordinates(tempStr, &realLat, &realLon)) {
 			//HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_15);
-			sprintf(strLat, "%d.%d",(int)realLat, (int)(realLat*1000000)%10000000);
-			sprintf(strLon, "%d.%d",(int)realLon, (int)(realLon*1000000)%106000000);
+			sprintf(strLat, "%d.%d", (int) realLat,
+					(int) (realLat * 1000000) % 10000000);
+			sprintf(strLon, "%d.%d", (int) realLon,
+					(int) (realLon * 1000000) % 106000000);
 		}
 		osDelay(1);
 	}
@@ -387,7 +411,6 @@ void StartMPUTask(void const * argument)
 				gyro_deg[i] -= gyro_result[i] * time_sample / 1000;
 			}
 		}
-
 		/* Compass */
 		readNormalize(compass);
 
@@ -415,7 +438,8 @@ void StartMPUTask(void const * argument)
 		heading2 = atan2(Yh, Xh);
 
 		heading = atan2(compass[1], compass[0]);
-		declinationAngle = (0 + (37.0 / 60.0)) / (180 / M_PI);
+//		declinationAngle = (0 + (37.0 / 60.0)) / (180 / M_PI);
+		declinationAngle = (0 + (39.0 / 60.0)) / (180 / M_PI);
 		heading -= declinationAngle;
 		heading2 -= declinationAngle;
 		if (heading < 0) {
@@ -427,7 +451,28 @@ void StartMPUTask(void const * argument)
 		}
 		headingDegrees = heading * 180 / M_PI;
 		headingDegrees2 = heading2 * 180 / M_PI;
-		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
+
+//		if (abs(headingDegrees2 - 320) <= 1.5) {
+//		if (1) {
+//			initGyro = true;
+//			if (!mapAngle) {
+//				// Init value for Gyro_z - map angle
+//				gyro_deg[2] = headingDegrees2;
+//				mapAngle = true;
+//			}
+//		}
+//		if (initGyro) {
+		if (1) {
+			/* Gyroscope */
+			MPU6050_Read_Gyro(&hi2c1, gyro_result, MPU6050_GYRO_SENS_250); //MPU6050_GYRO_SENS_250
+			for (uint8_t i = 0; i < 3; i++) {
+				if (abs(gyro_result[i]) > 0.01) {
+					gyro_deg[i] -= gyro_result[i] * time_sample / 1000;
+				}
+			}
+			int16_t t = gyro_deg[2] / 360;
+			yaw_gyro_deg = gyro_deg[2] / 2 - t * 360;
+		}
 		osDelayUntil(&time_until, time_sample);
 	}
   /* USER CODE END StartMPUTask */
@@ -469,22 +514,56 @@ void StartMotorTask(void const * argument)
 {
   /* USER CODE BEGIN StartMotorTask */
 	uint32_t time_until;
-	uint8_t time_sample = 10;
-	uint8_t l_cntT = 0; /* counter variable to generate interrupt each 1s */
-	enc1 = 1;
+	uint8_t time_sample = 15;
+	speed_run(FRONT_LEFT, 0);
+	speed_run(FRONT_RIGHT, 0);
+	speed_run(BACK_LEFT, 0);
+	speed_run(BACK_RIGHT, 0);
+	/* init PID */
+	pidFL = newPID(0.3, 0, 20); //2 0 10
+	pidFR = newPID(0.3, 0, 20);
+	pidBL = newPID(0.3, 0, 20);
+	pidBR = newPID(0.3, 0, 20);
+	/* counter variable to generate interrupt each 1s */
+	uint8_t l_cntT = 0;
 	/* Infinite loop */
 	for (;;) {
-		/* each 10ms */
+		/* each 15ms */
 		l_cntT++;
-		l_enc3 = __HAL_TIM_GET_COUNTER(&htim3);
-		CountPulse(l_enc3, l_pre_enc3, &l_cnt3, &enc3, &htim3);
-		enc2 = 999;
+
+		/* read encoder */
+		l_enc_FL = __HAL_TIM_GET_COUNTER(&htim2);
+		l_enc_FR = __HAL_TIM_GET_COUNTER(&htim3);
+		l_enc_BL = __HAL_TIM_GET_COUNTER(&htim1);
+		l_enc_BR = __HAL_TIM_GET_COUNTER(&htim4);
+
+		pidFL._input = l_enc_FL;
+		pidFR._input = l_enc_FR;
+		pidBL._input = l_enc_BL;
+		pidBR._input = l_enc_BR;
+
+		computePID(&pidFL, pidFL._setPoint);
+		computePID(&pidFR, pidFR._setPoint);
+		computePID(&pidBL, pidBL._setPoint);
+		computePID(&pidBR, pidBR._setPoint);
+
+//		speed_run(FRONT_LEFT, pidFL._output);
+//		speed_run(FRONT_RIGHT, pidFR._output);
+//		speed_run(BACK_LEFT, pidBL._output);
+//		speed_run(BACK_RIGHT, pidBR._output);
+
+		speed_run(FRONT_LEFT, 200);
+		speed_run(FRONT_RIGHT,200);
+		speed_run(BACK_LEFT, 200);
+		speed_run(BACK_RIGHT, 200);
+
+		__HAL_TIM_SET_COUNTER(&htim2, 0);
+		__HAL_TIM_SET_COUNTER(&htim3, 0);
+		__HAL_TIM_SET_COUNTER(&htim1, 0);
+		__HAL_TIM_SET_COUNTER(&htim4, 0);
 		/* each 1s */
-		if (l_cntT >= 100) {
-			HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_15| GPIO_PIN_13|GPIO_PIN_14| GPIO_PIN_12);
+		if (l_cntT >= 60) {
 			l_cntT = 0;
-			l_pre_enc3 = l_enc3;
-			enc4=9999;
 		}
 		osDelayUntil(&time_until, time_sample);
 	}
