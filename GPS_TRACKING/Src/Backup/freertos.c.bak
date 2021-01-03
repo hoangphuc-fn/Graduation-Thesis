@@ -218,7 +218,7 @@ void MX_FREERTOS_Init(void) {
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* definition and creation of lcdTask */
-  osThreadDef(lcdTask, StartLcdTask, osPriorityIdle, 0, 128);
+  osThreadDef(lcdTask, StartLcdTask, osPriorityIdle, 0, 250);
   lcdTaskHandle = osThreadCreate(osThread(lcdTask), NULL);
 
   /* definition and creation of uartGPS */
@@ -226,11 +226,11 @@ void MX_FREERTOS_Init(void) {
   uartGPSHandle = osThreadCreate(osThread(uartGPS), NULL);
 
   /* definition and creation of gpsTask */
-  osThreadDef(gpsTask, StartGpsTask, osPriorityRealtime, 0, 200);
+  osThreadDef(gpsTask, StartGpsTask, osPriorityHigh, 0, 200);
   gpsTaskHandle = osThreadCreate(osThread(gpsTask), NULL);
 
   /* definition and creation of mpuTask */
-  osThreadDef(mpuTask, StartMPUTask, osPriorityRealtime, 0, 250);
+  osThreadDef(mpuTask, StartMPUTask, osPriorityHigh, 0, 250);
   mpuTaskHandle = osThreadCreate(osThread(mpuTask), NULL);
 
   /* definition and creation of uartESP */
@@ -272,7 +272,9 @@ void StartDefaultTask(void const * argument)
 		osDelayUntil(&time_until, time_sample);
 	}
 	for (;;) {
-		run_straight(0, yaw_gyro_deg * 2.5, speed, 20);
+//		run_straight(0, yaw_gyro_deg * 2.5, speed, 25);
+		run_shift_left(0, yaw_gyro_deg * 2.5, speed, 25);
+//		run_shift_right(0, yaw_gyro_deg * 2.5, speed, 25);
 		cnt++;
 		if (cnt >= 100) {
 			hihi++;
@@ -302,12 +304,8 @@ void StartLcdTask(void const * argument)
 		ST7920_SendString(0, 0, lcdLine00);
 		sprintf(lcdLine01, "A:%d  ", (int) yaw_gyro_deg);
 		ST7920_SendString(0, 3, lcdLine01);
-		sprintf(lcdLine1, "gyro[2]: %d ", (int) gyro_deg[2]);
-		ST7920_SendString(1, 0, lcdLine1);
-		sprintf(lcdLine2, "default: %d", hihi);
-		ST7920_SendString(2, 0, lcdLine2);
-		sprintf(lcdLine3, "speed: %d", speed);
-		ST7920_SendString(3, 0, lcdLine3);
+		ST7920_SendString(2, 0, strLat);
+		ST7920_SendString(3, 0, strLon);
 		osDelay(10);
 	}
   /* USER CODE END StartLcdTask */
@@ -365,9 +363,9 @@ void StartGpsTask(void const * argument)
 		if (getCoordinates(tempStr, &realLat, &realLon)) {
 			//HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_15);
 			sprintf(strLat, "%d.%d", (int) realLat,
-					(int) (realLat * 1000000) % 10000000);
+					(int) (realLat * 10000000) % 10000000);
 			sprintf(strLon, "%d.%d", (int) realLon,
-					(int) (realLon * 1000000) % 106000000);
+					(int) (realLon * 10000000) % 106000000);
 		}
 		osDelay(1);
 	}
@@ -547,15 +545,34 @@ void StartMotorTask(void const * argument)
 		computePID(&pidBL, pidBL._setPoint);
 		computePID(&pidBR, pidBR._setPoint);
 
-//		speed_run(FRONT_LEFT, pidFL._output);
-//		speed_run(FRONT_RIGHT, pidFR._output);
-//		speed_run(BACK_LEFT, pidBL._output);
-//		speed_run(BACK_RIGHT, pidBR._output);
-
-		speed_run(FRONT_LEFT, 200);
-		speed_run(FRONT_RIGHT,200);
-		speed_run(BACK_LEFT, 200);
-		speed_run(BACK_RIGHT, 200);
+		speed_run(FRONT_LEFT, pidFL._output);
+		speed_run(BACK_LEFT, pidBL._output);
+		speed_run(BACK_RIGHT, pidBR._output);
+		if (running_type == RUN_STRAIGHT) {
+			if (abs(pidFR._input) < 5) {
+				/* encoder of FR wheel DOES NOT work */
+				speed_run(FRONT_RIGHT, pidBR._output);
+			} else {
+				/* encoder of FR wheel works normally */
+				speed_run(FRONT_RIGHT, pidFR._output);
+			}
+		} else if (running_type == SHILF_LEFT) {
+			if (abs(pidFR._input) < 5) {
+				/* encoder of FR wheel DOES NOT work */
+				speed_run(FRONT_RIGHT, -pidBR._output);
+			} else {
+				/* encoder of FR wheel works normally */
+				speed_run(FRONT_RIGHT, pidFR._output);
+			}
+		} else if (running_type == SHIFT_RIGHT) {
+			if (abs(pidFR._input) < 5) {
+				/* encoder of FR wheel DOES NOT work */
+				speed_run(FRONT_RIGHT, -pidBR._output);
+			} else {
+				/* encoder of FR wheel works normally */
+				speed_run(FRONT_RIGHT, pidFR._output);
+			}
+		}
 
 		__HAL_TIM_SET_COUNTER(&htim2, 0);
 		__HAL_TIM_SET_COUNTER(&htim3, 0);

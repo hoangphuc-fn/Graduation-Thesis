@@ -55,9 +55,19 @@ extern int32_t enc_BR;
 extern short l_enc_BR;				/* encoder value at now */
 extern short l_pre_enc_BR;			/* encoder value at 1s ago */
 extern int16_t l_cnt_BR;		/* revs of the value range */
+//---------
+extern uint8_t running_type;
+
+typedef enum{
+	RUN_STRAIGHT = 0,
+	SHILF_LEFT,
+	SHIFT_RIGHT
+}Type_Run_Typedef;
 
 void speed_run(Wheel_Typedef wheel, int16_t speed);
 void run_straight(int16_t target, int16_t actual, int16_t speed, uint8_t diff_speed);
+void run_shift_left(int16_t target, int16_t actual, int16_t speed, uint8_t diff_speed);
+void run_shift_right(int16_t target, int16_t actual, int16_t speed, uint8_t diff_speed);
 void CountPulse(short l_enc, short l_pre_enc, short *l_cnt, int32_t* enc, TIM_HandleTypeDef* htim);
 
 PID newPID(float kP, float kI, float kD);

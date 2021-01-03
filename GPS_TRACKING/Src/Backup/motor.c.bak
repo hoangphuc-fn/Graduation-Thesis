@@ -25,6 +25,8 @@ PID pidFR;
 PID pidBL;
 PID pidBR;
 
+uint8_t running_type;
+
 void speed_run(Wheel_Typedef wheel, int16_t speed) {
 	if (speed > 0 && speed <= 1000) { // FORWARD
 		switch (wheel) {
@@ -115,6 +117,7 @@ void speed_run(Wheel_Typedef wheel, int16_t speed) {
 
 void run_straight(int16_t target, int16_t actual, int16_t speed,
 		uint8_t diff_speed) {
+	running_type = RUN_STRAIGHT;
 	uint8_t base_diff = 2;
 	if (actual - target >= 1) {
 		pidFL._setPoint = speed;
@@ -131,6 +134,47 @@ void run_straight(int16_t target, int16_t actual, int16_t speed,
 		pidFR._setPoint = speed;
 		pidBL._setPoint = speed + base_diff;
 		pidBR._setPoint = speed;
+	}
+}
+void run_shift_left(int16_t target, int16_t actual, int16_t speed,
+		uint8_t diff_speed) {
+	running_type = SHILF_LEFT;
+
+	if (actual - target >= 1) {
+		pidFL._setPoint = -(speed + diff_speed);
+		pidFR._setPoint = speed;
+		pidBL._setPoint = speed;
+		pidBR._setPoint = -speed;
+	} else if (actual - target <= -1) {
+		pidFL._setPoint = -speed;
+		pidFR._setPoint = speed;
+		pidBL._setPoint = speed + diff_speed;
+		pidBR._setPoint = -speed;
+	} else {
+		pidFL._setPoint = -speed;
+		pidFR._setPoint = speed;
+		pidBL._setPoint = speed;
+		pidBR._setPoint = -speed;
+	}
+}
+void run_shift_right(int16_t target, int16_t actual, int16_t speed,
+		uint8_t diff_speed) {
+	running_type = SHIFT_RIGHT;
+	if (actual - target >= 1) {
+		pidFL._setPoint = speed;
+		pidFR._setPoint = -speed;
+		pidBL._setPoint = -(speed + diff_speed);
+		pidBR._setPoint = speed + diff_speed;
+	} else if (actual - target <= -1) {
+		pidFL._setPoint = speed + diff_speed;
+		pidFR._setPoint = -(speed + diff_speed);
+		pidBL._setPoint = -speed;
+		pidBR._setPoint = speed;
+	} else {
+		pidFL._setPoint = speed;
+		pidFR._setPoint = -speed;
+		pidBL._setPoint = -speed;
+		pidBR._setPoint = speed + diff_speed;
 	}
 }
 
