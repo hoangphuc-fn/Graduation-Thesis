@@ -56,14 +56,14 @@
 /* USER CODE BEGIN PD */
 
 char strO[50] = "";
-char lcdLine00[10] = "";
-char lcdLine01[10] = "";
-char lcdLine1[50] = "";
-char lcdLine2[50] = "";
-char lcdLine3[50] = "";
-char lcdLine4[50] = "";
-char strLat[50] = "";
-char strLon[50] = "";
+char lcdDis[7] = "";
+char lcdBea[7] = "";
+char lcdHea[7] = "";
+char lcdAng[7] = "";
+char lcdTargetLat[10] = "";
+char lcdTargetLon[10] = "";
+char strLat[10] = "";
+char strLon[10] = "";
 
 /* For GPS */
 double realLat = 0;
@@ -112,12 +112,14 @@ short enc4 = 0;
 float O_pid;
 int setPoint;
 int8_t diff = 2;
-int16_t speed = 50;
+int16_t speed = 100;
 int8_t base_diff = 30;
 
 /* For main */
 Point targetPoint;
 Point currentPos;
+
+Point route[15];
 float distance;
 float bearing;
 uint16_t cntVatCan = 0;
@@ -277,49 +279,84 @@ void StartDefaultTask(void const *argument) {
 	/* USER CODE BEGIN StartDefaultTask */
 	uint32_t time_until;
 	uint8_t time_sample = 10;
-	uint8_t cnt = 0;
+	bool isCalib = false;
+
+	uint8_t index = 0;
 
 	//-----------------------------
-	targetPoint = newPoint(10.88316, 106.78117);
+	//targetPoint = newPoint(10.88316, 106.78117);
+//	route[0] = newPoint(10.88316, 106.78117);
+//	route[1] = newPoint(10.88342, 106.78149);
+//	route[2] = newPoint(10.88368, 106.78179);
+//	route[3] = newPoint(10.88328, 106.78214);
+
+	route[0] = newPoint(10.88518,106.78053 );
+	route[1] = newPoint(10.88525,106.78047 );
+	route[2] = newPoint(10.8853,106.78039  );
+	route[3] = newPoint(10.88534,106.78023 );
+	route[4] = newPoint(10.88531,106.78007 );
+	route[5] = newPoint(10.88524,106.77995 );
+	route[6] = newPoint(10.88513,106.77987 );
+	route[7] = newPoint(10.88498,106.77982 );
+	route[8] = newPoint(10.88489,106.77981 );
+	route[9] = newPoint(10.8848,106.77982  );
+	route[10] = newPoint(10.88473,106.77986 );
+
+//	route[0] = newPoint(10.88353,106.78017);
+//	route[1] = newPoint(10.8834,106.78003);
+//	route[2] = newPoint(10.88376,106.77974);
+
+	targetPoint = route[index];
+
 	/* Infinite loop */
 	while (1) {
 		if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1) == GPIO_PIN_RESET) {
-			speed += 5;
-			HAL_Delay(300);
+			speed += 10;
+			HAL_Delay(210);
 		}
 		if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET) {
 			break;
 		}
 		osDelayUntil(&time_until, time_sample);
 	}
+#if 1
+	resetTimer();
+	while (1) {
+		if (getTimer5ms() < 500 && !isCalib) {
+			if (calib(322, headingDegrees, 0, 0, 0)) {
+				isCalib = true;
+			}
+		} else {
+			isCalib = true;
+		}
+		if (isCalib) {
+			if (distance <= 3) {
+				speed_run_pid(-127, -127, -127, -127);
+				index++;
+				if (index < 11) {
+					targetPoint = route[index];
+				}
+				osDelay(1500);
+			} else if (distance <= 10) {
+				run_following_heading(bearing, yaw_gyro_deg, 50, 0, 15);
+			} else {
+				run_following_heading(bearing, yaw_gyro_deg, speed, 0, 15);
+			}
+		}
+		osDelay(1);
+	}
+#endif
 	for (;;) {
-//		run_straight(0, yaw_gyro_deg * 2.5, speed, 25);
-//		run_shift_left(0, yaw_gyro_deg * 2.5, speed, 25);
-//		run_shift_right(0, yaw_gyro_deg * 2.5, speed, 25);
-
-		// OK
-//		run_straight(0, yaw_gyro_deg * 2, speed, base_diff, 35);
-
-//		if (distance <= 5) {
-//			pidFL._setPoint = 50;
-//			pidFR._setPoint = -50;
-//			pidBL._setPoint = 50;
-//			pidBR._setPoint = -50;
-//		} else if (distance <= 15) {
-//			run_straight(0, yaw_gyro_deg * 2, speed * 0.7, base_diff * 0.7,
-//					speed * 0.7 * 0.5);
-//		} else {
-//			run_straight(0, yaw_gyro_deg * 2, speed, base_diff, 35);
-//		}
 		if (distance <= 5) {
 			pidFL._setPoint = 50;
 			pidFR._setPoint = -50;
 			pidBL._setPoint = 50;
 			pidBR._setPoint = -50;
 		} else if (distance <= 15) {
-			run_straight(0, yaw_gyro_deg * 2, speed * 0.7, base_diff, 15);
+			run_following_heading(0, yaw_gyro_deg * 2, speed * 0.7, base_diff,
+					15);
 		} else {
-			run_straight(0, yaw_gyro_deg * 2, speed, base_diff, 15);
+			run_following_heading(0, yaw_gyro_deg * 2, speed, base_diff, 15);
 		}
 		osDelayUntil(&time_until, time_sample);
 	}
@@ -335,22 +372,43 @@ void StartDefaultTask(void const *argument) {
 /* USER CODE END Header_StartLcdTask */
 void StartLcdTask(void const *argument) {
 	/* USER CODE BEGIN StartLcdTask */
+	uint32_t time_until;
+	uint8_t time_sample = 10;
+
 	delay_init();
 	ST7920_Init();
 	ST7920_Clear();
 	/* Infinite loop */
 	for (;;) {
-		sprintf(lcdLine00, "H:%d  ", (int) headingDegrees2);
-		ST7920_SendString(0, 0, lcdLine00);
-		sprintf(lcdLine01, "A:%d  ", (int) yaw_gyro_deg);
-		ST7920_SendString(0, 3, lcdLine01);
-		sprintf(lcdLine1, "dis:%d  bea:%d   ", (int) distance, (int) bearing);
-		ST7920_SendString(1, 0, lcdLine1);
+		/* Distance & bearing */
+		sprintf(lcdDis, "D:%d  ", (int) distance);
+		sprintf(lcdBea, "B:%d  ", (int) bearing);
+		/* Heading & angle */
+		sprintf(lcdHea, "H:%d  ", (int) headingDegrees);
+		sprintf(lcdAng, "A:%d  ", (int) yaw_gyro_deg);
+		/* Target Point */
+		sprintf(lcdTargetLat, "%d.%d", (int) targetPoint.lat,
+				(int) (targetPoint.lat * 100000) % 100000);
+		sprintf(lcdTargetLon, "%d.%d", (int) targetPoint.lon,
+				(int) (targetPoint.lon * 100000) % 1060000);
+		/* Current position */
+		sprintf(strLat, "%d.%d", (int) realLat,
+				(int) (realLat * 100000) % 100000);
+		sprintf(strLon, "%d.%d", (int) realLon,
+				(int) (realLon * 100000) % 1060000);
+
+		/* Print LCD */
+		ST7920_SendString(0, 5, lcdHea);
+		ST7920_SendString(1, 5, lcdAng);
+		ST7920_SendString(2, 5, lcdDis);
+		ST7920_SendString(3, 5, lcdBea);
+
+		ST7920_SendString(0, 0, lcdTargetLat);
+		ST7920_SendString(1, 0, lcdTargetLon);
 		ST7920_SendString(2, 0, strLat);
-		//ST7920_SendString(3, 0, strLon);
-		sprintf(lcdLine3, "speed: %d", speed);
-		ST7920_SendString(3, 0, lcdLine3);
-		osDelay(10);
+		ST7920_SendString(3, 0, strLon);
+		osDelayUntil(&time_until, time_sample);
+
 	}
 	/* USER CODE END StartLcdTask */
 }
@@ -373,8 +431,6 @@ void StartUartGPS(void const *argument) {
 		gpsData[cnt++] = C;
 		if (gpsData[cnt - 1] == '\n') {
 			if (strstr(gpsData, "GNGGA") != NULL) {
-				hehe++;
-				sprintf(strO, "count: %d", hehe);
 				osSemaphoreRelease(gpsDataSemHandle);
 			} else {
 				resetArray(gpsData, strlen(gpsData));
@@ -403,11 +459,6 @@ void StartGpsTask(void const *argument) {
 		strcpy(tempStr, gpsData);
 		resetArray(gpsData, strlen(gpsData));
 		if (getCoordinates(tempStr, &realLat, &realLon)) {
-			//HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_15);
-			sprintf(strLat, "%d.%d", (int) realLat,
-					(int) (realLat * 10000000) % 10000000);
-			sprintf(strLon, "%d.%d", (int) realLon,
-					(int) (realLon * 10000000) % 106000000);
 			currentPos = newPoint(realLat, realLon);
 			distance = calDistance(currentPos, targetPoint);
 			bearing = calBearing(currentPos, targetPoint);
@@ -437,83 +488,88 @@ void StartMPUTask(void const *argument) {
 		HAL_Delay(100);
 	}
 
-	setRange(HMC5883L_RANGE_1_3GA); //HMC5883L_RANGE_8_1GA
-	setMeasurementMode(HMC5883L_CONTINOUS);
+	setRange(HMC5883L_RANGE_1_3GA); //HMC5883L_RANGE_8_1GA	HMC5883L_RANGE_1_3GA
+	setMeasurementMode(HMC5883L_IDLE); //HMC5883L_CONTINOUS
 	setDataRate(HMC5883L_DATARATE_75HZ);
 	setSamples(HMC5883L_SAMPLES_8);
+
+//	MyKalman kalmanY = newKalman(0.001, 0.003, 0.03);
+//	MyKalman kalmanX = newKalman(0.001, 0.003, 0.03);
 
 	MyKalman kalmanY = newKalman(0.001, 0.003, 0.03);
 	MyKalman kalmanX = newKalman(0.001, 0.003, 0.03);
 	/* Infinite loop */
 	for (;;) {
 		/* Gyroscope */
-		MPU6050_Read_Gyro(&hi2c1, gyro_result, MPU6050_GYRO_SENS_250);
-		for (uint8_t i = 0; i < 3; i++) {
-			if (abs(gyro_result[i]) > 0.1) {
-				gyro_deg[i] -= gyro_result[i] * time_sample / 1000;
-			}
+		MPU6050_Read_Gyro(&hi2c1, gyro_result, MPU6050_GYRO_SENS_250); //MPU6050_GYRO_SENS_250
+//		for (uint8_t i = 0; i < 3; i++) {
+//			if (abs(gyro_result[i]) > 0.1) {
+//				gyro_deg[i] -= gyro_result[i] * time_sample / 1005;
+//			} /*else if (gyro_result[i] < -0.1) {
+//				gyro_deg[i] -= gyro_result[i] * time_sample / 995;
+//			}*/
+//		}
+		if (gyro_result[2] > 1) {
+			gyro_deg[2] -= gyro_result[2] * time_sample / 1003;
+		} else if (gyro_result[2] < -1) {
+			gyro_deg[2] -= gyro_result[2] * time_sample / 985;
+		}
+		if (gyro_deg[2] >= 360) {
+			gyro_deg[2] -= 360;
+		} else if (gyro_deg[2] < 0) {
+			gyro_deg[2] += 360;
 		}
 		/* Compass */
 		readNormalize(compass);
 
-		/* Accelerometer */
-		MPU6050_Read_Accel(&hi2c1, acce_result, MPU6050_ACCE_SENS_2);
-		accPitch = -atan2(acce_result[0],
-				sqrt(
-						acce_result[1] * acce_result[1]
-								+ acce_result[2] * acce_result[2]));
-		accRoll = atan2(acce_result[1], acce_result[2]);
-		kalPitch = kalmanUpdate(&kalmanY, accPitch, gyro_result[1],
-				time_sample * 1000);
-		kalPitch = kalmanUpdate(&kalmanX, accRoll, gyro_result[0],
-				time_sample * 1000);
-
-		float cosRoll = cos(accRoll);
-		float sinRoll = sin(accRoll);
-		float cosPitch = cos(accPitch);
-		float sinPitch = sin(accPitch);
-
-		float Xh = compass[0] * cosPitch + compass[2] * sinPitch;
-		float Yh = compass[0] * sinRoll * sinPitch + compass[1] * cosRoll
-				- compass[2] * sinRoll * cosPitch;
-
-		heading2 = atan2(Yh, Xh);
+//		/* Accelerometer */
+//		MPU6050_Read_Accel(&hi2c1, acce_result, MPU6050_ACCE_SENS_2);
+//		accPitch = -atan2(acce_result[0],
+//				sqrt(
+//						acce_result[1] * acce_result[1]
+//								+ acce_result[2] * acce_result[2]));
+//		accRoll = atan2(acce_result[1], acce_result[2]);
+//		kalPitch = kalmanUpdate(&kalmanY, accPitch, gyro_result[1],
+//				time_sample * 1000);
+//		kalPitch = kalmanUpdate(&kalmanX, accRoll, gyro_result[0],
+//				time_sample * 1000);
+//
+//		float cosRoll = cos(accRoll);
+//		float sinRoll = sin(accRoll);
+//		float cosPitch = cos(accPitch);
+//		float sinPitch = sin(accPitch);
+//
+//		float Xh = compass[0] * cosPitch + compass[2] * sinPitch;
+//		float Yh = compass[0] * sinRoll * sinPitch + compass[1] * cosRoll
+//				- compass[2] * sinRoll * cosPitch;
+//
+//		heading2 = atan2(Yh, Xh);
 
 		heading = atan2(compass[1], compass[0]);
-//		declinationAngle = (0 + (37.0 / 60.0)) / (180 / M_PI);
 		declinationAngle = (0 + (39.0 / 60.0)) / (180 / M_PI);
 		heading -= declinationAngle;
-		heading2 -= declinationAngle;
+//		heading2 -= declinationAngle;
 		if (heading < 0) {
 			heading += 2 * M_PI;
-			heading2 += 2 * M_PI;
+//			heading2 += 2 * M_PI;
 		} else if (heading > 2 * M_PI) {
 			heading -= 2 * M_PI;
-			heading2 += 2 * M_PI;
+//			heading2 += 2 * M_PI;
 		}
 		headingDegrees = heading * 180 / M_PI;
-		headingDegrees2 = heading2 * 180 / M_PI;
+//		headingDegrees2 = heading2 * 180 / M_PI;
 
-		if (abs(headingDegrees2 - 322) <= 0.8) {
-			initGyro = true;
-			//gyro_deg[2] = headingDegrees2;
+		if (abs(headingDegrees - 322) <= 1) {
+			gyro_deg[2] = headingDegrees;
+		} else if (abs(headingDegrees - 18) <= 1) {
+			gyro_deg[2] = headingDegrees + 32;
+		} else if (abs(headingDegrees - 271) <= 1) {
+			gyro_deg[2] = headingDegrees - 41;
+		} else if (abs(headingDegrees - 118) <= 1) {
+			gyro_deg[2] = headingDegrees + 23;
 		}
-//		if (initGyro) {
-		if (1) {
-			/* Gyroscope */
-			MPU6050_Read_Gyro(&hi2c1, gyro_result, MPU6050_GYRO_SENS_250); //MPU6050_GYRO_SENS_250
-			for (uint8_t i = 0; i < 3; i++) {
-				if (abs(gyro_result[i]) > 0.05) {
-					gyro_deg[i] -= gyro_result[i] * time_sample / 15000;
-				}
-			}
-			if (gyro_deg[2] >= 360) {
-				gyro_deg[2] -= 360;
-			} else if (gyro_deg[2] < 0) {
-				//gyro_deg[2] += 360;
-			}
-			yaw_gyro_deg = gyro_deg[2];
-		}
+		cntTimer5ms++;
+		yaw_gyro_deg = gyro_deg[2];
 		osDelayUntil(&time_until, time_sample);
 	}
 	/* USER CODE END StartMPUTask */
@@ -570,10 +626,6 @@ void StartMotorTask(void const *argument) {
 	/* USER CODE BEGIN StartMotorTask */
 	uint32_t time_until;
 	uint8_t time_sample = 15;
-	speed_run(FRONT_LEFT, 0);
-	speed_run(FRONT_RIGHT, 0);
-	speed_run(BACK_LEFT, 0);
-	speed_run(BACK_RIGHT, 0);
 	/* init PID */
 	pidFL = newPID(0.3, 0, 20); //2 0 10
 	pidFR = newPID(0.3, 0, 20);
@@ -584,9 +636,6 @@ void StartMotorTask(void const *argument) {
 	/* Infinite loop */
 	for (;;) {
 		/* each 15ms */
-		if (vatCan) {
-			cntVatCan++;
-		}
 		l_cntT++;
 
 		/* read encoder */
@@ -654,36 +703,6 @@ void cvtCoordinates(double tempCoor, double *gCoor) {
 	int temp = (int) tempCoor / 100;
 	*gCoor = temp + ((tempCoor - 100 * temp) / 60);
 }
-
-//bool getCoordinates(char rawStr[], double* pLat, double* pLon){
-//    bool isAvailable = false;
-//    double lLat = 0;
-//    double lLon = 0;
-//    if(strstr(rawStr,"$GNGGA")!=NULL){
-//        int cnt = 0;
-//        char* subStr = strtok(rawStr,",");
-//        while(subStr!=NULL){
-//            cnt++;
-//            if(cnt==3){
-//                lLat = atof(subStr);
-//            }
-//            else if(cnt == 5){
-//                lLon = atof(subStr);
-//            }
-//            subStr = strtok(NULL,",");
-//            if(cnt > 8){
-//                isAvailable = true;
-//            }
-//        }
-//    }
-//    if(isAvailable){
-//        cvtCoordinates(lLat, pLat);
-//        cvtCoordinates(lLon, pLon);
-//        return true;
-//    } else{
-//        return false;
-//    }
-//}
 
 bool getCoordinates(char rawStr[], double *pLat, double *pLon) {
 	uint8_t cntComma = 2;
