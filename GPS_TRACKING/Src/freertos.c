@@ -70,17 +70,19 @@ double realLat = 0;
 double realLon = 0;
 uint8_t C;
 char gpsData[100];
-uint64_t hehe = 0;
-uint16_t hihi = 0;
+uint16_t checkGPS;
 bool isOverFlow = false;
 
 /* For ESP */
-char espData[100];
+char espData[400];
+char dataSend[25];
 uint8_t Ce;
+uint16_t checkESP;
 uint16_t disLeft;
 uint16_t disFront;
 uint16_t disRight;
 char *token;
+uint16_t debug = 0;
 
 /* For MPU */
 extern float gyro_deg[3];
@@ -145,6 +147,7 @@ osThreadId gpsTaskHandle;
 osThreadId mpuTaskHandle;
 osThreadId uartESPHandle;
 osThreadId motorTaskHandle;
+osThreadId toESPHandle;
 osMutexId gpsDataMutexHandle;
 osSemaphoreId gpsDataSemHandle;
 
@@ -164,6 +167,7 @@ void StartGpsTask(void const *argument);
 void StartMPUTask(void const *argument);
 void StartUartESP(void const *argument);
 void StartMotorTask(void const *argument);
+void StartToESP(void const *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -236,13 +240,12 @@ void MX_FREERTOS_Init(void) {
 
 	/* Create the thread(s) */
 	/* definition and creation of defaultTask */
-	osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
-	defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
-
-	/* definition and creation of lcdTask */
-	osThreadDef(lcdTask, StartLcdTask, osPriorityIdle, 0, 250);
-	lcdTaskHandle = osThreadCreate(osThread(lcdTask), NULL);
-
+//	osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
+//	defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+//
+//	/* definition and creation of lcdTask */
+//	osThreadDef(lcdTask, StartLcdTask, osPriorityIdle, 0, 250);
+//	lcdTaskHandle = osThreadCreate(osThread(lcdTask), NULL);
 	/* definition and creation of uartGPS */
 	osThreadDef(uartGPS, StartUartGPS, osPriorityRealtime, 0, 128);
 	uartGPSHandle = osThreadCreate(osThread(uartGPS), NULL);
@@ -252,15 +255,18 @@ void MX_FREERTOS_Init(void) {
 	gpsTaskHandle = osThreadCreate(osThread(gpsTask), NULL);
 
 	/* definition and creation of mpuTask */
-	osThreadDef(mpuTask, StartMPUTask, osPriorityHigh, 0, 250);
-	mpuTaskHandle = osThreadCreate(osThread(mpuTask), NULL);
-
+//	osThreadDef(mpuTask, StartMPUTask, osPriorityHigh, 0, 250);
+//	mpuTaskHandle = osThreadCreate(osThread(mpuTask), NULL);
 	/* definition and creation of uartESP */
-//  osThreadDef(uartESP, StartUartESP, osPriorityIdle, 0, 200);
-//  uartESPHandle = osThreadCreate(osThread(uartESP), NULL);
+	osThreadDef(uartESP, StartUartESP, osPriorityRealtime, 0, 200);
+	uartESPHandle = osThreadCreate(osThread(uartESP), NULL);
+
 	/* definition and creation of motorTask */
-	osThreadDef(motorTask, StartMotorTask, osPriorityIdle, 0, 128);
-	motorTaskHandle = osThreadCreate(osThread(motorTask), NULL);
+//	osThreadDef(motorTask, StartMotorTask, osPriorityIdle, 0, 128);
+//	motorTaskHandle = osThreadCreate(osThread(motorTask), NULL);
+	/* definition and creation of toESP */
+	osThreadDef(toESP, StartToESP, osPriorityNormal, 0, 128);
+	toESPHandle = osThreadCreate(osThread(toESP), NULL);
 
 	/* USER CODE BEGIN RTOS_THREADS */
 	/* add threads, ... */
@@ -290,17 +296,17 @@ void StartDefaultTask(void const *argument) {
 //	route[2] = newPoint(10.88368, 106.78179);
 //	route[3] = newPoint(10.88328, 106.78214);
 
-	route[0] = newPoint(10.88518,106.78053 );
-	route[1] = newPoint(10.88525,106.78047 );
-	route[2] = newPoint(10.8853,106.78039  );
-	route[3] = newPoint(10.88534,106.78023 );
-	route[4] = newPoint(10.88531,106.78007 );
-	route[5] = newPoint(10.88524,106.77995 );
-	route[6] = newPoint(10.88513,106.77987 );
-	route[7] = newPoint(10.88498,106.77982 );
-	route[8] = newPoint(10.88489,106.77981 );
-	route[9] = newPoint(10.8848,106.77982  );
-	route[10] = newPoint(10.88473,106.77986 );
+	route[0] = newPoint(10.88518, 106.78053);
+	route[1] = newPoint(10.88525, 106.78047);
+	route[2] = newPoint(10.8853, 106.78039);
+	route[3] = newPoint(10.88534, 106.78023);
+	route[4] = newPoint(10.88531, 106.78007);
+	route[5] = newPoint(10.88524, 106.77995);
+	route[6] = newPoint(10.88513, 106.77987);
+	route[7] = newPoint(10.88498, 106.77982);
+	route[8] = newPoint(10.88489, 106.77981);
+	route[9] = newPoint(10.8848, 106.77982);
+	route[10] = newPoint(10.88473, 106.77986);
 
 //	route[0] = newPoint(10.88353,106.78017);
 //	route[1] = newPoint(10.8834,106.78003);
@@ -452,6 +458,7 @@ void StartUartGPS(void const *argument) {
 void StartGpsTask(void const *argument) {
 	/* USER CODE BEGIN StartGpsTask */
 	char tempStr[100];
+	checkGPS = 0;
 	/* Infinite loop */
 	for (;;) {
 		osSemaphoreWait(gpsDataSemHandle, 2000);
@@ -459,9 +466,14 @@ void StartGpsTask(void const *argument) {
 		strcpy(tempStr, gpsData);
 		resetArray(gpsData, strlen(gpsData));
 		if (getCoordinates(tempStr, &realLat, &realLon)) {
+			checkGPS++;
+			sprintf(dataSend, "%d.%d,%d.%d\n", (int) realLat,
+					(int) (realLat * 100000) % 1000000, (int) realLon,
+					(int) (realLon * 100000) % 10600000);
 			currentPos = newPoint(realLat, realLon);
 			distance = calDistance(currentPos, targetPoint);
 			bearing = calBearing(currentPos, targetPoint);
+			osThreadResume(toESPHandle);
 		}
 		osDelay(1);
 	}
@@ -584,33 +596,31 @@ void StartMPUTask(void const *argument) {
 /* USER CODE END Header_StartUartESP */
 void StartUartESP(void const *argument) {
 	/* USER CODE BEGIN StartUartESP */
-	uint32_t time_until;
 	uint8_t cnt = 0;
-	//HAL_UART_Receive_IT(&huart5, espData, 13);
+	debug = 0;
+	HAL_UART_Receive_IT(&huart5, &Ce, 1);
 	/* Infinite loop */
 	for (;;) {
-		//sprintf(data_send, "%d.%d, %d.%d\n",(int)realLat, (int)(realLat*1000000)%10000000, (int)realLon, (int)(realLon*1000000)%106000000);
-//		gcvt(temp1, 6, buf1);
-//		gcvt(temp2, 8, buf2);
-//		sprintf(data_send, "%s,%s\n", buf1,buf2);
-//		UART_Print(&huart5,data_send);
-//		//UART_Print(&huart5,"235\n");
-//		while(HAL_UART_GetState(&huart5)!= HAL_UART_STATE_BUSY_TX);
-		resetArray(espData, strlen(espData));
-		HAL_UART_Receive_IT(&huart5, espData, 13);
-
-		token = strtok(espData, " ");
-		disLeft = atoi(token);
-
-//		token = strtok(NULL, " ");
-//		disFront = atoi(token);
-//
-//		token = strtok(NULL," ");
-//		disRight = atoi(token);
-
-		resetArray(espData, strlen(espData));
-		osDelay(50);
-
+		osThreadSuspend(uartESPHandle);
+		if (debug == 0) {
+			resetArray(espData, strlen(espData));
+//			if (Ce == 'R') {
+//				osThreadSuspend(defaultTaskHandle);
+//				osThreadSuspend(lcdTaskHandle);
+//				osThreadSuspend(uartGPSHandle);
+//				osThreadSuspend(gpsTaskHandle);
+//				osThreadSuspend(mpuTaskHandle);
+////				osThreadSuspend(uartESPHandle);
+//				osThreadSuspend(motorTaskHandle);
+//				osThreadSuspend(toESPHandle);
+//			}
+		}
+		espData[debug++] = Ce;
+		if (espData[debug - 1] == '\n') {
+			debug = 0;
+			//resetArray(espData, strlen(espData));
+		}
+		HAL_UART_Receive_IT(&huart5, &Ce, 1);
 	}
 	/* USER CODE END StartUartESP */
 }
@@ -697,6 +707,26 @@ void StartMotorTask(void const *argument) {
 	/* USER CODE END StartMotorTask */
 }
 
+/* USER CODE BEGIN Header_StartToESP */
+/**
+ * @brief Function implementing the toESP thread.
+ * @param argument: Not used
+ * @retval None
+ */
+/* USER CODE END Header_StartToESP */
+void StartToESP(void const *argument) {
+	/* USER CODE BEGIN StartToESP */
+	checkESP = 0;
+	/* Infinite loop */
+	for (;;) {
+		osThreadSuspend(toESPHandle);
+		checkESP++;
+		UART_Print(&huart5, dataSend);
+		osDelay(1);
+	}
+	/* USER CODE END StartToESP */
+}
+
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
 void cvtCoordinates(double tempCoor, double *gCoor) {
@@ -745,15 +775,6 @@ bool getCoordinates(char rawStr[], double *pLat, double *pLon) {
 	return false;
 }
 
-int json_myobj_read(const char *buf, DirectionData *myobj) {
-	/* Mapping of JSON attributes to C my_object's struct members */
-	const struct json_attr_t json_attrs[] = { { "lat", t_real, .addr.real =
-			&(myobj->lat) }, { "lon", t_real, .addr.real = &(myobj->lon) }, {
-			"angle", t_real, .addr.real = &(myobj->angle) }, { "dis", t_real,
-			.addr.real = &(myobj->dis) }, { NULL }, };
-	/* Parse the JSON string from buffer */
-	return json_read_object(buf, json_attrs, NULL);
-}
 
 void resetArray(char pArr[], uint8_t length) {
 	for (int i = 0; i < length; i++) {

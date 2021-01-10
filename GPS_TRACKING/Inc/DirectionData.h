@@ -14,8 +14,6 @@ typedef enum AddResultCodeEnum {
 typedef struct direction_data{
     double lat;
     double lon;
-    double angle;
-    double dis;
 } DirectionData;
 
 typedef struct DirectionDataNode_Tag
@@ -31,6 +29,8 @@ typedef struct
     int count;
 } DirectionDataList;
 
+
+DirectionData* newData(char* str);
 void DirectionDataList_Init(DirectionDataList *);
 AddResultCode DirectionDataList_Put(DirectionDataList *, DirectionData *);
 DirectionData *DirectionDataList_Get(DirectionDataList *);

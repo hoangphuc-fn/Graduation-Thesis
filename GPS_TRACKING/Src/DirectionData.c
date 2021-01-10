@@ -81,3 +81,29 @@ void DirectionDataList_Clear(DirectionDataList *list)
     }
     DirectionDataList_Init(list);
 }
+
+DirectionData* newData(char* str){
+	DirectionData *newPoint = (DirectionData *)malloc(sizeof(DirectionData));
+	char lat[10]="";
+	char lon[10]="";
+	int i = 0;
+	int iLatLon = 0;
+	for(i;i<strlen(str);i++){
+		if(str[i]==','){
+			iLatLon = 0;
+			i++;
+			break;
+		}
+		lat[iLatLon++] = str[i];
+	}
+	for(i;i<strlen(str);i++){
+		if(str[i]==','){
+			iLatLon = 0;
+			break;
+		}
+		lon[iLatLon++] = str[i];
+	}
+	newPoint->lat = atof(lat);
+	newPoint->lon = atof(lon);
+	return newPoint;
+}

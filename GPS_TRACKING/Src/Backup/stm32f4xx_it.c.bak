@@ -65,6 +65,7 @@ extern TIM_HandleTypeDef htim6;
 
 /* USER CODE BEGIN EV */
 extern osThreadId uartGPSHandle;
+extern osThreadId uartESPHandle;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -187,7 +188,7 @@ void UART5_IRQHandler(void)
   /* USER CODE END UART5_IRQn 0 */
   HAL_UART_IRQHandler(&huart5);
   /* USER CODE BEGIN UART5_IRQn 1 */
-
+  osThreadResume(uartESPHandle);
   /* USER CODE END UART5_IRQn 1 */
 }
 
