@@ -33,7 +33,8 @@
 #include "hal_i2c_hmc5883l.h"
 #include <string.h>
 #include <stdbool.h>
-
+#include "DirectionData.h"
+#include "utils.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -70,6 +71,15 @@ extern bool isOverFlow;
 uint8_t check;
 bool gpsAvailable = false;
 bool espAvailable = false;
+bool route = false;
+
+extern char strLat[10];
+extern char strLon[10];
+
+extern Point targetPoint;
+extern Point currentPos;
+
+DirectionDataList list;
 
 extern void resetArray(char pArr[], uint8_t length);
 /* USER CODE END PV */
@@ -128,6 +138,7 @@ int main(void) {
 	MX_TIM8_Init();
 	MX_UART5_Init();
 	MX_SPI1_Init();
+	MX_USART3_UART_Init();
 	/* USER CODE BEGIN 2 */
 	// Encoder
 	HAL_TIM_Encoder_Start(&htim1, TIM_CHANNEL_1 | TIM_CHANNEL_2);
@@ -139,17 +150,22 @@ int main(void) {
 	HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_3);
 	HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_4);
-
 	uint8_t iGPS = 0;
 	uint16_t iESP = 0;
 	HAL_UART_Receive_IT(&huart4, &C, 1);
-	HAL_UART_Receive_IT(&huart5, &Ce, 1);
+	HAL_UART_Receive_IT(&huart3, &Ce, 1);
+
+	DirectionDataList_Init(&list);
+	delay_init();
+	ST7920_Init();
+	ST7920_Clear();
 	/* USER CODE END 2 */
 
 	/* Call init function for freertos objects (in freertos.c) */
+//	route = true;
 //	MX_FREERTOS_Init();
 	/* Start scheduler */
-	//osKernelStart();
+//	osKernelStart();
 	/* We should never get here as control is now taken by the scheduler */
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
@@ -157,36 +173,58 @@ int main(void) {
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
-//		if (gpsAvailable) {
-//			gpsData[iGPS++] = C;
-//			gpsAvailable = false;
-//			if (gpsData[iGPS - 1] == '\n') {
-//				iGPS = 0;
-//				if (strstr(gpsData, "GNGGA") != NULL) {
-//					check++;
-//					strcpy(tempStr, gpsData);
-//					resetArray(gpsData, strlen(gpsData));
-//					if (getCoordinates(tempStr, &realLat, &realLon)) {
-//						checkGPS++;
-//						sprintf(dataSend, "%d.%d,%d.%d\n", (int) realLat,
-//								(int) (realLat * 100000) % 1000000,
-//								(int) realLon,
-//								(int) (realLon * 100000) % 10600000);
-//						UART_Print(&huart5, dataSend);
-//					}
-//				} else {
-//					resetArray(gpsData, strlen(gpsData));
-//				}
-//			}
-//		}
-		if(espAvailable){
+		if (gpsAvailable) {
+			gpsData[iGPS++] = C;
+			gpsAvailable = false;
+			if (gpsData[iGPS - 1] == '\n') {
+				iGPS = 0;
+				if (strstr(gpsData, "GNGGA") != NULL) {
+					check++;
+					strcpy(tempStr, gpsData);
+					resetArray(gpsData, strlen(gpsData));
+					if (getCoordinates(tempStr, &realLat, &realLon)) {
+						sprintf(dataSend, "%d.%d,%d.%d\n", (int) realLat,
+								(int) (realLat * 100000) % 1000000,
+								(int) realLon,
+								(int) (realLon * 100000) % 10600000);
+						sprintf(strLat, "%d.%d", (int) realLat,
+								(int) (realLat * 100000) % 100000);
+						sprintf(strLon, "%d.%d", (int) realLon,
+								(int) (realLon * 100000) % 1060000);
+						ST7920_SendString(2, 0, strLat);
+						ST7920_SendString(3, 0, strLon);
+						UART_Print(&huart5, dataSend);
+					}
+				} else {
+					resetArray(gpsData, strlen(gpsData));
+				}
+			}
+		}
+		if (espAvailable) {
 			espData[iESP++] = Ce;
 			espAvailable = false;
+			if (espData[iESP - 1] == '\r') {
+				char *subStr = strtok(espData, "m");
+				while (subStr != NULL) {
+					DirectionDataList_Put(&list, newData(subStr));
+					subStr = strtok(NULL, "m");
+				}
+				route = true;
+				MX_FREERTOS_Init();
+				osKernelStart();
+			}
+		}
+
+		if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1) == GPIO_PIN_RESET) {
+			DirectionData *temp = DirectionDataList_Get(&list);
+			targetPoint = newPoint(temp->lat, temp->lon);
+			HAL_Delay(400);
 		}
 
 	}
 	/* USER CODE END 3 */
 }
+
 /**
  * @brief System Clock Configuration
  * @retval None

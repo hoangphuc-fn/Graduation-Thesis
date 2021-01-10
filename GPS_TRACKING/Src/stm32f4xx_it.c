@@ -61,6 +61,7 @@
 /* External variables --------------------------------------------------------*/
 extern UART_HandleTypeDef huart4;
 extern UART_HandleTypeDef huart5;
+extern UART_HandleTypeDef huart3;
 extern TIM_HandleTypeDef htim6;
 
 /* USER CODE BEGIN EV */
@@ -71,7 +72,8 @@ extern bool gpsAvailable;
 extern bool espAvailable;
 extern uint8_t C;
 extern uint8_t Ce;
-uint8_t cu=0;
+uint8_t cu = 0;
+extern bool route;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -161,6 +163,19 @@ void DebugMon_Handler(void) {
 /******************************************************************************/
 
 /**
+ * @brief This function handles USART3 global interrupt.
+ */
+void USART3_IRQHandler(void) {
+	/* USER CODE BEGIN USART3_IRQn 0 */
+
+	/* USER CODE END USART3_IRQn 0 */
+	HAL_UART_IRQHandler(&huart3);
+	/* USER CODE BEGIN USART3_IRQn 1 */
+
+	/* USER CODE END USART3_IRQn 1 */
+}
+
+/**
  * @brief This function handles UART4 global interrupt.
  */
 void UART4_IRQHandler(void) {
@@ -169,8 +184,8 @@ void UART4_IRQHandler(void) {
 	/* USER CODE END UART4_IRQn 0 */
 	HAL_UART_IRQHandler(&huart4);
 	/* USER CODE BEGIN UART4_IRQn 1 */
-//	osThreadResume(uartGPSHandle);
-	HAL_UART_Receive_IT(&huart4, &C, 1);
+
+//	HAL_UART_Receive_IT(&huart4, &C, 1);
 	/* USER CODE END UART4_IRQn 1 */
 }
 
@@ -184,19 +199,7 @@ void UART5_IRQHandler(void) {
 	HAL_UART_IRQHandler(&huart5);
 	/* USER CODE BEGIN UART5_IRQn 1 */
 	//osThreadResume(uartESPHandle);
-	HAL_UART_Receive_IT(&huart5, &Ce, 1);
 	/* USER CODE END UART5_IRQn 1 */
-}
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-	if (huart->Instance == huart5.Instance) {
-		espAvailable = true;
-		HAL_UART_Receive_IT(&huart5, &Ce, 1);
-	}
-	if (huart->Instance == huart4.Instance) {
-		gpsAvailable = true;
-		HAL_UART_Receive_IT(&huart4, &C, 1);
-	}
 }
 
 /**
@@ -213,6 +216,20 @@ void TIM6_DAC_IRQHandler(void) {
 }
 
 /* USER CODE BEGIN 1 */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	if (huart->Instance == huart4.Instance) {
 
+		if (route) {
+			osThreadResume(uartGPSHandle);
+		} else {
+			gpsAvailable = true;
+			HAL_UART_Receive_IT(&huart4, &C, 1);
+		}
+	}
+	if (huart->Instance == huart3.Instance) {
+		espAvailable = true;
+		HAL_UART_Receive_IT(&huart3, &Ce, 1);
+	}
+}
 /* USER CODE END 1 */
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

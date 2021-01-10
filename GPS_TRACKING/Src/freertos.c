@@ -102,6 +102,7 @@ float kalRoll = 0;
 float yaw_gyro_deg = 0;
 bool initGyro = false;
 bool mapAngle = false;
+bool isDone = false;
 
 uint64_t sec = 0;
 
@@ -126,6 +127,8 @@ float distance;
 float bearing;
 uint16_t cntVatCan = 0;
 bool vatCan = false;
+
+extern DirectionDataList list;
 
 /* USER CODE END PD */
 
@@ -240,12 +243,13 @@ void MX_FREERTOS_Init(void) {
 
 	/* Create the thread(s) */
 	/* definition and creation of defaultTask */
-//	osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
-//	defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
-//
-//	/* definition and creation of lcdTask */
-//	osThreadDef(lcdTask, StartLcdTask, osPriorityIdle, 0, 250);
-//	lcdTaskHandle = osThreadCreate(osThread(lcdTask), NULL);
+	osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
+	defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+
+	/* definition and creation of lcdTask */
+	osThreadDef(lcdTask, StartLcdTask, osPriorityIdle, 0, 250);
+	lcdTaskHandle = osThreadCreate(osThread(lcdTask), NULL);
+
 	/* definition and creation of uartGPS */
 	osThreadDef(uartGPS, StartUartGPS, osPriorityRealtime, 0, 128);
 	uartGPSHandle = osThreadCreate(osThread(uartGPS), NULL);
@@ -255,19 +259,19 @@ void MX_FREERTOS_Init(void) {
 	gpsTaskHandle = osThreadCreate(osThread(gpsTask), NULL);
 
 	/* definition and creation of mpuTask */
-//	osThreadDef(mpuTask, StartMPUTask, osPriorityHigh, 0, 250);
-//	mpuTaskHandle = osThreadCreate(osThread(mpuTask), NULL);
+	osThreadDef(mpuTask, StartMPUTask, osPriorityHigh, 0, 250);
+	mpuTaskHandle = osThreadCreate(osThread(mpuTask), NULL);
+
 	/* definition and creation of uartESP */
-	osThreadDef(uartESP, StartUartESP, osPriorityRealtime, 0, 200);
-	uartESPHandle = osThreadCreate(osThread(uartESP), NULL);
-
+//  osThreadDef(uartESP, StartUartESP, osPriorityIdle, 0, 200);
+//  uartESPHandle = osThreadCreate(osThread(uartESP), NULL);
 	/* definition and creation of motorTask */
-//	osThreadDef(motorTask, StartMotorTask, osPriorityIdle, 0, 128);
-//	motorTaskHandle = osThreadCreate(osThread(motorTask), NULL);
-	/* definition and creation of toESP */
-	osThreadDef(toESP, StartToESP, osPriorityNormal, 0, 128);
-	toESPHandle = osThreadCreate(osThread(toESP), NULL);
+	osThreadDef(motorTask, StartMotorTask, osPriorityIdle, 0, 128);
+	motorTaskHandle = osThreadCreate(osThread(motorTask), NULL);
 
+	/* definition and creation of toESP */
+//  osThreadDef(toESP, StartToESP, osPriorityNormal, 0, 128);
+//  toESPHandle = osThreadCreate(osThread(toESP), NULL);
 	/* USER CODE BEGIN RTOS_THREADS */
 	/* add threads, ... */
 	/* USER CODE END RTOS_THREADS */
@@ -296,28 +300,31 @@ void StartDefaultTask(void const *argument) {
 //	route[2] = newPoint(10.88368, 106.78179);
 //	route[3] = newPoint(10.88328, 106.78214);
 
-	route[0] = newPoint(10.88518, 106.78053);
-	route[1] = newPoint(10.88525, 106.78047);
-	route[2] = newPoint(10.8853, 106.78039);
-	route[3] = newPoint(10.88534, 106.78023);
-	route[4] = newPoint(10.88531, 106.78007);
-	route[5] = newPoint(10.88524, 106.77995);
-	route[6] = newPoint(10.88513, 106.77987);
-	route[7] = newPoint(10.88498, 106.77982);
-	route[8] = newPoint(10.88489, 106.77981);
-	route[9] = newPoint(10.8848, 106.77982);
-	route[10] = newPoint(10.88473, 106.77986);
+//	route[0] = newPoint(10.88518, 106.78053);
+//	route[1] = newPoint(10.88525, 106.78047);
+//	route[2] = newPoint(10.8853, 106.78039);
+//	route[3] = newPoint(10.88534, 106.78023);
+//	route[4] = newPoint(10.88531, 106.78007);
+//	route[5] = newPoint(10.88524, 106.77995);
+//	route[6] = newPoint(10.88513, 106.77987);
+//	route[7] = newPoint(10.88498, 106.77982);
+//	route[8] = newPoint(10.88489, 106.77981);
+//	route[9] = newPoint(10.8848, 106.77982);
+//	route[10] = newPoint(10.88473, 106.77986);
 
 //	route[0] = newPoint(10.88353,106.78017);
 //	route[1] = newPoint(10.8834,106.78003);
 //	route[2] = newPoint(10.88376,106.77974);
 
-	targetPoint = route[index];
+	DirectionData *temp = DirectionDataList_Get(&list);
+	targetPoint = newPoint(temp->lat, temp->lon);
+	free(temp);
+//	targetPoint = route[index];
 
 	/* Infinite loop */
 	while (1) {
 		if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1) == GPIO_PIN_RESET) {
-			speed += 10;
+			//speed += 10;
 			HAL_Delay(210);
 		}
 		if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET) {
@@ -328,7 +335,7 @@ void StartDefaultTask(void const *argument) {
 #if 1
 	resetTimer();
 	while (1) {
-		if (getTimer5ms() < 500 && !isCalib) {
+		if (getTimer5ms() < 800 && !isCalib) {
 			if (calib(322, headingDegrees, 0, 0, 0)) {
 				isCalib = true;
 			}
@@ -338,15 +345,19 @@ void StartDefaultTask(void const *argument) {
 		if (isCalib) {
 			if (distance <= 3) {
 				speed_run_pid(-127, -127, -127, -127);
-				index++;
-				if (index < 11) {
-					targetPoint = route[index];
+				if (list.count == 0) {
+					isDone = true;
+					run_following_heading(bearing, yaw_gyro_deg, 0, 0, 0);
+				} else if (list.count > 0) {
+					DirectionData *temp = DirectionDataList_Get(&list);
+					targetPoint = newPoint(temp->lat, temp->lon);
+					free(temp);
 				}
 				osDelay(1500);
 			} else if (distance <= 10) {
 				run_following_heading(bearing, yaw_gyro_deg, 50, 0, 15);
 			} else {
-				run_following_heading(bearing, yaw_gyro_deg, speed, 0, 15);
+				run_following_heading(bearing, yaw_gyro_deg, 70, 0, 15);
 			}
 		}
 		osDelay(1);
@@ -473,7 +484,6 @@ void StartGpsTask(void const *argument) {
 			currentPos = newPoint(realLat, realLon);
 			distance = calDistance(currentPos, targetPoint);
 			bearing = calBearing(currentPos, targetPoint);
-			osThreadResume(toESPHandle);
 		}
 		osDelay(1);
 	}
@@ -774,7 +784,6 @@ bool getCoordinates(char rawStr[], double *pLat, double *pLon) {
 	}
 	return false;
 }
-
 
 void resetArray(char pArr[], uint8_t length) {
 	for (int i = 0; i < length; i++) {
