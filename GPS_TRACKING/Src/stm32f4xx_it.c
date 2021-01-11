@@ -74,6 +74,12 @@ extern uint8_t C;
 extern uint8_t Ce;
 uint8_t cu = 0;
 extern bool route;
+
+extern char disStr[15];
+extern uint8_t iDis;
+extern uint8_t disL;
+extern uint8_t disF;
+extern uint8_t disR;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -100,6 +106,7 @@ void HardFault_Handler(void) {
 	/* USER CODE END HardFault_IRQn 0 */
 	while (1) {
 		/* USER CODE BEGIN W1_HardFault_IRQn 0 */
+		break;
 		/* USER CODE END W1_HardFault_IRQn 0 */
 	}
 }
@@ -227,8 +234,24 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 		}
 	}
 	if (huart->Instance == huart3.Instance) {
-		espAvailable = true;
-		HAL_UART_Receive_IT(&huart3, &Ce, 1);
+		if (route) {
+//			osThreadResume(uartESPHandle);
+			disStr[iDis++] = Ce;
+			if (disStr[iDis - 1] == '\n') {
+				char *subStr = strtok(disStr, ",");
+				disL = atoi(subStr);
+				subStr = strtok(NULL, ",");
+				disF = atoi(subStr);
+				subStr = strtok(NULL, ",");
+				disR = atoi(subStr);
+				resetArray(disStr, 15);
+				iDis = 0;
+			}
+			HAL_UART_Receive_IT(&huart3, &Ce, 1);
+		} else {
+			espAvailable = true;
+			HAL_UART_Receive_IT(&huart3, &Ce, 1);
+		}
 	}
 }
 /* USER CODE END 1 */

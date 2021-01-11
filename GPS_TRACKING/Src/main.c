@@ -210,12 +210,13 @@ int main(void) {
 					subStr = strtok(NULL, "m");
 				}
 				route = true;
+				resetArray(espData, 400);
 				MX_FREERTOS_Init();
 				osKernelStart();
 			}
 		}
 
-		if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1) == GPIO_PIN_RESET) {
+		if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET) {
 			DirectionData *temp = DirectionDataList_Get(&list);
 			targetPoint = newPoint(temp->lat, temp->lon);
 			HAL_Delay(400);

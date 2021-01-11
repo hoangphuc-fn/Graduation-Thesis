@@ -122,11 +122,17 @@ int8_t base_diff = 30;
 Point targetPoint;
 Point currentPos;
 
-Point route[15];
 float distance;
 float bearing;
 uint16_t cntVatCan = 0;
 bool vatCan = false;
+
+char disStr[15];
+uint8_t iDis = 0;
+
+uint8_t disL;
+uint8_t disF;
+uint8_t disR;
 
 extern DirectionDataList list;
 
@@ -243,11 +249,11 @@ void MX_FREERTOS_Init(void) {
 
 	/* Create the thread(s) */
 	/* definition and creation of defaultTask */
-	osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
+	osThreadDef(defaultTask, StartDefaultTask, osPriorityHigh, 0, 128);
 	defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
 	/* definition and creation of lcdTask */
-	osThreadDef(lcdTask, StartLcdTask, osPriorityIdle, 0, 250);
+	osThreadDef(lcdTask, StartLcdTask, osPriorityHigh, 0, 250);
 	lcdTaskHandle = osThreadCreate(osThread(lcdTask), NULL);
 
 	/* definition and creation of uartGPS */
@@ -259,14 +265,14 @@ void MX_FREERTOS_Init(void) {
 	gpsTaskHandle = osThreadCreate(osThread(gpsTask), NULL);
 
 	/* definition and creation of mpuTask */
-	osThreadDef(mpuTask, StartMPUTask, osPriorityHigh, 0, 250);
+	osThreadDef(mpuTask, StartMPUTask, osPriorityRealtime, 0, 250);
 	mpuTaskHandle = osThreadCreate(osThread(mpuTask), NULL);
 
 	/* definition and creation of uartESP */
-//  osThreadDef(uartESP, StartUartESP, osPriorityIdle, 0, 200);
-//  uartESPHandle = osThreadCreate(osThread(uartESP), NULL);
+//	osThreadDef(uartESP, StartUartESP, osPriorityIdle, 0, 200);
+//	uartESPHandle = osThreadCreate(osThread(uartESP), NULL);
 	/* definition and creation of motorTask */
-	osThreadDef(motorTask, StartMotorTask, osPriorityIdle, 0, 128);
+	osThreadDef(motorTask, StartMotorTask, osPriorityHigh, 0, 128);
 	motorTaskHandle = osThreadCreate(osThread(motorTask), NULL);
 
 	/* definition and creation of toESP */
@@ -292,41 +298,15 @@ void StartDefaultTask(void const *argument) {
 	bool isCalib = false;
 
 	uint8_t index = 0;
-
+//	HAL_UART_Receive_IT(&huart3, &Ce, 1);
 	//-----------------------------
-	//targetPoint = newPoint(10.88316, 106.78117);
-//	route[0] = newPoint(10.88316, 106.78117);
-//	route[1] = newPoint(10.88342, 106.78149);
-//	route[2] = newPoint(10.88368, 106.78179);
-//	route[3] = newPoint(10.88328, 106.78214);
-
-//	route[0] = newPoint(10.88518, 106.78053);
-//	route[1] = newPoint(10.88525, 106.78047);
-//	route[2] = newPoint(10.8853, 106.78039);
-//	route[3] = newPoint(10.88534, 106.78023);
-//	route[4] = newPoint(10.88531, 106.78007);
-//	route[5] = newPoint(10.88524, 106.77995);
-//	route[6] = newPoint(10.88513, 106.77987);
-//	route[7] = newPoint(10.88498, 106.77982);
-//	route[8] = newPoint(10.88489, 106.77981);
-//	route[9] = newPoint(10.8848, 106.77982);
-//	route[10] = newPoint(10.88473, 106.77986);
-
-//	route[0] = newPoint(10.88353,106.78017);
-//	route[1] = newPoint(10.8834,106.78003);
-//	route[2] = newPoint(10.88376,106.77974);
 
 	DirectionData *temp = DirectionDataList_Get(&list);
 	targetPoint = newPoint(temp->lat, temp->lon);
 	free(temp);
-//	targetPoint = route[index];
 
 	/* Infinite loop */
 	while (1) {
-		if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1) == GPIO_PIN_RESET) {
-			//speed += 10;
-			HAL_Delay(210);
-		}
 		if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET) {
 			break;
 		}
@@ -343,38 +323,32 @@ void StartDefaultTask(void const *argument) {
 			isCalib = true;
 		}
 		if (isCalib) {
-			if (distance <= 3) {
-				speed_run_pid(-127, -127, -127, -127);
-				if (list.count == 0) {
-					isDone = true;
-					run_following_heading(bearing, yaw_gyro_deg, 0, 0, 0);
-				} else if (list.count > 0) {
-					DirectionData *temp = DirectionDataList_Get(&list);
-					targetPoint = newPoint(temp->lat, temp->lon);
-					free(temp);
-				}
-				osDelay(1500);
-			} else if (distance <= 10) {
-				run_following_heading(bearing, yaw_gyro_deg, 50, 0, 15);
+			if (isDone) {
+				speed_run_pid(0, 0, 0, 0);
 			} else {
-				run_following_heading(bearing, yaw_gyro_deg, 70, 0, 15);
+				if (distance <= 5) {
+					speed_run_pid(30, 30, 30, 30);
+					if (list.count == 1) {
+						isDone = true;
+						break;
+					} else if (list.count > 1) {
+						DirectionData *temp = DirectionDataList_Get(&list);
+						targetPoint = newPoint(temp->lat, temp->lon);
+						free(temp);
+					}
+					osDelay(1300);
+				} else if (distance <= 10) {
+					run_following_heading(bearing, yaw_gyro_deg, 50, 0, 15);
+				} else {
+					run_following_heading(bearing, yaw_gyro_deg, 65, 0, 15);
+				}
 			}
 		}
 		osDelay(1);
 	}
 #endif
 	for (;;) {
-		if (distance <= 5) {
-			pidFL._setPoint = 50;
-			pidFR._setPoint = -50;
-			pidBL._setPoint = 50;
-			pidBR._setPoint = -50;
-		} else if (distance <= 15) {
-			run_following_heading(0, yaw_gyro_deg * 2, speed * 0.7, base_diff,
-					15);
-		} else {
-			run_following_heading(0, yaw_gyro_deg * 2, speed, base_diff, 15);
-		}
+		run_following_heading(bearing, yaw_gyro_deg, 0, 0, 0);
 		osDelayUntil(&time_until, time_sample);
 	}
 	/* USER CODE END StartDefaultTask */
@@ -607,30 +581,20 @@ void StartMPUTask(void const *argument) {
 void StartUartESP(void const *argument) {
 	/* USER CODE BEGIN StartUartESP */
 	uint8_t cnt = 0;
-	debug = 0;
-	HAL_UART_Receive_IT(&huart5, &Ce, 1);
+	HAL_UART_Receive_IT(&huart3, &Ce, 1);
 	/* Infinite loop */
 	for (;;) {
 		osThreadSuspend(uartESPHandle);
-		if (debug == 0) {
-			resetArray(espData, strlen(espData));
-//			if (Ce == 'R') {
-//				osThreadSuspend(defaultTaskHandle);
-//				osThreadSuspend(lcdTaskHandle);
-//				osThreadSuspend(uartGPSHandle);
-//				osThreadSuspend(gpsTaskHandle);
-//				osThreadSuspend(mpuTaskHandle);
-////				osThreadSuspend(uartESPHandle);
-//				osThreadSuspend(motorTaskHandle);
-//				osThreadSuspend(toESPHandle);
-//			}
-		}
-		espData[debug++] = Ce;
-		if (espData[debug - 1] == '\n') {
-			debug = 0;
-			//resetArray(espData, strlen(espData));
-		}
-		HAL_UART_Receive_IT(&huart5, &Ce, 1);
+		checkESP++;
+//		if (cnt == 0) {
+//			resetArray(espData, strlen(espData));
+//		}
+//		espData[cnt++] = Ce;
+//		if (espData[cnt - 1] == '\n') {
+//			cnt = 0;
+//			resetArray(espData, strlen(espData));
+//		}
+		HAL_UART_Receive_IT(&huart3, &Ce, 1);
 	}
 	/* USER CODE END StartUartESP */
 }

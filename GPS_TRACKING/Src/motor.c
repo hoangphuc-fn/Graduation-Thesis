@@ -26,6 +26,9 @@ PID pidBL;
 PID pidBR;
 
 extern int8_t leftRight;
+extern uint8_t disL;
+extern uint8_t disF;
+extern uint8_t disR;
 
 uint8_t running_type;
 
@@ -172,61 +175,69 @@ void run_following_heading(int16_t target, int16_t actual, int16_t speed,
 		int8_t base_diff, uint8_t diff_speed) {
 	running_type = RUN_STRAIGHT;
 	int16_t opposite;
-	uint8_t speed_cua = 30;
-	if (abs(actual - target) >= 7) {
-		if (0 <= target && target <= 180) {
-			opposite = target + 180;
-			if (target < actual && actual <= opposite) {
-				// turn left
-				speed_run_pid(-0.6 * speed_cua, speed_cua, -5, 0.6 * speed_cua);
-			} else {
-				//turn right
-				speed_run_pid(speed_cua, -0.9 * speed_cua, 0.6 * speed_cua, -5);
-			}
-		} else {
-			// >180
-			opposite = target - 180;
-			if (opposite < actual && actual <= target) {
-				//turn right
-				speed_run_pid(speed_cua, -0.9 * speed_cua, 0.6 * speed_cua, -5);
-			} else {
-				// turn left
-				speed_run_pid(-0.6 * speed_cua, speed_cua, -5, 0.6 * speed_cua);
-			}
-		}
-
+	uint8_t speed_cua = 60;
+	if (disF > 0 && disF < 20) {
+		speed_run_pid(0, 0, 0, 0);
 	} else {
-		if (actual - target >= 1.5/2) {
-			pidFL._setPoint = speed - diff_speed;
-			pidFR._setPoint = speed + diff_speed;
-			pidBL._setPoint = speed - diff_speed;
-			pidBR._setPoint = speed + diff_speed;
-		} else if (actual - target <= -2.5/2) {
-			pidFL._setPoint = speed + diff_speed;
-			pidFR._setPoint = speed - diff_speed;
-			pidBL._setPoint = speed + diff_speed;
-			pidBR._setPoint = speed - diff_speed;
+		if (abs(actual - target) >= 7) {
+			if (0 <= target && target <= 180) {
+				opposite = target + 180;
+				if (target < actual && actual <= opposite) {
+					// turn left
+					speed_run_pid(-0.2 * speed_cua, speed_cua, -0.2 * speed_cua,
+							speed_cua);
+				} else {
+					//turn right
+					speed_run_pid(speed_cua, -0.2 * speed_cua, speed_cua,
+							-0.2 * speed_cua);
+				}
+			} else {
+				// >180
+				opposite = target - 180;
+				if (opposite < actual && actual <= target) {
+					//turn right
+					speed_run_pid(speed_cua, -0.2 * speed_cua, speed_cua,
+							-0.2 * speed_cua);
+				} else {
+					// turn left
+					speed_run_pid(-0.2 * speed_cua, speed_cua, -0.2 * speed_cua,
+							speed_cua);
+				}
+			}
+
 		} else {
-			pidFL._setPoint = speed;
-			pidFR._setPoint = speed;
-			pidBL._setPoint = speed;
-			pidBR._setPoint = speed;
-		}
-		if (actual - target >= 1.5 / 2) {
-			pidFL._setPoint = speed - diff_speed;
-			pidFR._setPoint = speed + diff_speed;
-			pidBL._setPoint = speed - diff_speed;
-			pidBR._setPoint = speed + diff_speed;
-		} else if (actual - target <= -2.5 / 2) {
-			pidFL._setPoint = speed + diff_speed;
-			pidFR._setPoint = speed - diff_speed;
-			pidBL._setPoint = speed + diff_speed;
-			pidBR._setPoint = speed - diff_speed;
-		} else {
-			pidFL._setPoint = speed;
-			pidFR._setPoint = speed + base_diff;
-			pidBL._setPoint = speed;
-			pidBR._setPoint = speed + base_diff;
+			if (actual - target >= 1.5 / 2) {
+				pidFL._setPoint = speed - diff_speed;
+				pidFR._setPoint = speed + diff_speed;
+				pidBL._setPoint = speed - diff_speed;
+				pidBR._setPoint = speed + diff_speed;
+			} else if (actual - target <= -2.5 / 2) {
+				pidFL._setPoint = speed + diff_speed;
+				pidFR._setPoint = speed - diff_speed;
+				pidBL._setPoint = speed + diff_speed;
+				pidBR._setPoint = speed - diff_speed;
+			} else {
+				pidFL._setPoint = speed;
+				pidFR._setPoint = speed;
+				pidBL._setPoint = speed;
+				pidBR._setPoint = speed;
+			}
+			if (actual - target >= 1.5 / 2) {
+				pidFL._setPoint = speed - diff_speed;
+				pidFR._setPoint = speed + diff_speed;
+				pidBL._setPoint = speed - diff_speed;
+				pidBR._setPoint = speed + diff_speed;
+			} else if (actual - target <= -2.5 / 2) {
+				pidFL._setPoint = speed + diff_speed;
+				pidFR._setPoint = speed - diff_speed;
+				pidBL._setPoint = speed + diff_speed;
+				pidBR._setPoint = speed - diff_speed;
+			} else {
+				pidFL._setPoint = speed;
+				pidFR._setPoint = speed + base_diff;
+				pidBL._setPoint = speed;
+				pidBR._setPoint = speed + base_diff;
+			}
 		}
 	}
 }
