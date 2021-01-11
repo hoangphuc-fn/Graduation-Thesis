@@ -68,14 +68,15 @@ extern char dataSend[25];
 extern char espData[400];
 extern uint16_t checkGPS;
 extern bool isOverFlow;
-uint8_t check;
+uint16_t check;
 bool gpsAvailable = false;
 bool espAvailable = false;
 bool route = false;
 
 extern char strLat[10];
 extern char strLon[10];
-
+char lcdLine0[15];
+char lcdLine1[15];
 extern Point targetPoint;
 extern Point currentPos;
 
@@ -159,6 +160,7 @@ int main(void) {
 	delay_init();
 	ST7920_Init();
 	ST7920_Clear();
+	ST7920_SendString(0, 0, "Initializing...");
 	/* USER CODE END 2 */
 
 	/* Call init function for freertos objects (in freertos.c) */
@@ -179,10 +181,12 @@ int main(void) {
 			if (gpsData[iGPS - 1] == '\n') {
 				iGPS = 0;
 				if (strstr(gpsData, "GNGGA") != NULL) {
-					check++;
 					strcpy(tempStr, gpsData);
 					resetArray(gpsData, strlen(gpsData));
+					sprintf(lcdLine1, "health check:%d", (int) check++);
+					ST7920_SendString(1, 0, lcdLine1);
 					if (getCoordinates(tempStr, &realLat, &realLon)) {
+
 						sprintf(dataSend, "%d.%d,%d.%d\n", (int) realLat,
 								(int) (realLat * 100000) % 1000000,
 								(int) realLon,
@@ -191,8 +195,11 @@ int main(void) {
 								(int) (realLat * 100000) % 100000);
 						sprintf(strLon, "%d.%d", (int) realLon,
 								(int) (realLon * 100000) % 1060000);
+						sprintf(lcdLine0, "GPS check:%d    ", (int) checkGPS++);
+						ST7920_SendString(0, 0, lcdLine0);
 						ST7920_SendString(2, 0, strLat);
 						ST7920_SendString(3, 0, strLon);
+
 						UART_Print(&huart5, dataSend);
 					}
 				} else {
