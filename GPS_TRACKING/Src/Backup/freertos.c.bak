@@ -102,6 +102,7 @@ float kalRoll = 0;
 float yaw_gyro_deg = 0;
 bool initGyro = false;
 bool mapAngle = false;
+bool isDone = false;
 
 uint64_t sec = 0;
 
@@ -121,11 +122,24 @@ int8_t base_diff = 30;
 Point targetPoint;
 Point currentPos;
 
-Point route[15];
 float distance;
 float bearing;
 uint16_t cntVatCan = 0;
 bool vatCan = false;
+
+char disStr[15];
+uint8_t iDis;
+uint8_t disL;
+uint8_t disF;
+uint8_t disR;
+uint8_t disOK;
+
+uint32_t checkMotor = 0;
+uint32_t checkMPU = 0;
+uint32_t checkMTask = 0;
+bool isCalib = false;
+
+extern DirectionDataList list;
 
 /* USER CODE END PD */
 
@@ -160,19 +174,20 @@ void resetArray(char pArr[], uint8_t length);
 void resetArray(char pArr[], uint8_t length);
 /* USER CODE END FunctionPrototypes */
 
-void StartDefaultTask(void const * argument);
-void StartLcdTask(void const * argument);
-void StartUartGPS(void const * argument);
-void StartGpsTask(void const * argument);
-void StartMPUTask(void const * argument);
-void StartUartESP(void const * argument);
-void StartMotorTask(void const * argument);
-void StartToESP(void const * argument);
+void StartDefaultTask(void const *argument);
+void StartLcdTask(void const *argument);
+void StartUartGPS(void const *argument);
+void StartGpsTask(void const *argument);
+void StartMPUTask(void const *argument);
+void StartUartESP(void const *argument);
+void StartMotorTask(void const *argument);
+void StartToESP(void const *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
 /* GetIdleTaskMemory prototype (linked to static allocation support) */
-void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize );
+void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer,
+		StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize);
 
 /* Hook prototypes */
 void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName);
@@ -203,76 +218,74 @@ void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer,
 /* USER CODE END GET_IDLE_TASK_MEMORY */
 
 /**
-  * @brief  FreeRTOS initialization
-  * @param  None
-  * @retval None
-  */
+ * @brief  FreeRTOS initialization
+ * @param  None
+ * @retval None
+ */
 void MX_FREERTOS_Init(void) {
-  /* USER CODE BEGIN Init */
+	/* USER CODE BEGIN Init */
 
-  /* USER CODE END Init */
-  /* Create the mutex(es) */
-  /* definition and creation of gpsDataMutex */
-  osMutexDef(gpsDataMutex);
-  gpsDataMutexHandle = osMutexCreate(osMutex(gpsDataMutex));
+	/* USER CODE END Init */
+	/* Create the mutex(es) */
+	/* definition and creation of gpsDataMutex */
+	osMutexDef(gpsDataMutex);
+	gpsDataMutexHandle = osMutexCreate(osMutex(gpsDataMutex));
 
-  /* USER CODE BEGIN RTOS_MUTEX */
+	/* USER CODE BEGIN RTOS_MUTEX */
 	/* add mutexes, ... */
-  /* USER CODE END RTOS_MUTEX */
+	/* USER CODE END RTOS_MUTEX */
 
-  /* Create the semaphores(s) */
-  /* definition and creation of gpsDataSem */
-  osSemaphoreDef(gpsDataSem);
-  gpsDataSemHandle = osSemaphoreCreate(osSemaphore(gpsDataSem), 1);
+	/* Create the semaphores(s) */
+	/* definition and creation of gpsDataSem */
+	osSemaphoreDef(gpsDataSem);
+	gpsDataSemHandle = osSemaphoreCreate(osSemaphore(gpsDataSem), 1);
 
-  /* USER CODE BEGIN RTOS_SEMAPHORES */
+	/* USER CODE BEGIN RTOS_SEMAPHORES */
 	/* add semaphores, ... */
-  /* USER CODE END RTOS_SEMAPHORES */
+	/* USER CODE END RTOS_SEMAPHORES */
 
-  /* USER CODE BEGIN RTOS_TIMERS */
+	/* USER CODE BEGIN RTOS_TIMERS */
 	/* start timers, add new ones, ... */
-  /* USER CODE END RTOS_TIMERS */
+	/* USER CODE END RTOS_TIMERS */
 
-  /* USER CODE BEGIN RTOS_QUEUES */
+	/* USER CODE BEGIN RTOS_QUEUES */
 	/* add queues, ... */
-  /* USER CODE END RTOS_QUEUES */
+	/* USER CODE END RTOS_QUEUES */
 
-  /* Create the thread(s) */
-  /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
-  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+	/* Create the thread(s) */
+	/* definition and creation of defaultTask */
+	osThreadDef(defaultTask, StartDefaultTask, osPriorityRealtime, 0, 128);
+	defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
-  /* definition and creation of lcdTask */
-  osThreadDef(lcdTask, StartLcdTask, osPriorityIdle, 0, 250);
-  lcdTaskHandle = osThreadCreate(osThread(lcdTask), NULL);
+	/* definition and creation of lcdTask */
+	osThreadDef(lcdTask, StartLcdTask, osPriorityIdle, 0, 250);
+	lcdTaskHandle = osThreadCreate(osThread(lcdTask), NULL);
 
-  /* definition and creation of uartGPS */
-  osThreadDef(uartGPS, StartUartGPS, osPriorityRealtime, 0, 128);
-  uartGPSHandle = osThreadCreate(osThread(uartGPS), NULL);
+	/* definition and creation of uartGPS */
+	osThreadDef(uartGPS, StartUartGPS, osPriorityRealtime, 0, 128);
+	uartGPSHandle = osThreadCreate(osThread(uartGPS), NULL);
 
-  /* definition and creation of gpsTask */
-  osThreadDef(gpsTask, StartGpsTask, osPriorityHigh, 0, 200);
-  gpsTaskHandle = osThreadCreate(osThread(gpsTask), NULL);
+	/* definition and creation of gpsTask */
+	osThreadDef(gpsTask, StartGpsTask, osPriorityHigh, 0, 200);
+	gpsTaskHandle = osThreadCreate(osThread(gpsTask), NULL);
 
-  /* definition and creation of mpuTask */
-  osThreadDef(mpuTask, StartMPUTask, osPriorityHigh, 0, 250);
-  mpuTaskHandle = osThreadCreate(osThread(mpuTask), NULL);
+	/* definition and creation of mpuTask */
+	osThreadDef(mpuTask, StartMPUTask, osPriorityHigh, 0, 300);
+	mpuTaskHandle = osThreadCreate(osThread(mpuTask), NULL);
 
-  /* definition and creation of uartESP */
-  osThreadDef(uartESP, StartUartESP, osPriorityIdle, 0, 200);
-  uartESPHandle = osThreadCreate(osThread(uartESP), NULL);
+	/* definition and creation of uartESP */
+//  osThreadDef(uartESP, StartUartESP, osPriorityIdle, 0, 200);
+//  uartESPHandle = osThreadCreate(osThread(uartESP), NULL);
+	/* definition and creation of motorTask */
+	osThreadDef(motorTask, StartMotorTask, osPriorityRealtime, 0, 128);
+	motorTaskHandle = osThreadCreate(osThread(motorTask), NULL);
 
-  /* definition and creation of motorTask */
-  osThreadDef(motorTask, StartMotorTask, osPriorityIdle, 0, 128);
-  motorTaskHandle = osThreadCreate(osThread(motorTask), NULL);
-
-  /* definition and creation of toESP */
-  osThreadDef(toESP, StartToESP, osPriorityNormal, 0, 128);
-  toESPHandle = osThreadCreate(osThread(toESP), NULL);
-
-  /* USER CODE BEGIN RTOS_THREADS */
+	/* definition and creation of toESP */
+//  osThreadDef(toESP, StartToESP, osPriorityNormal, 0, 128);
+//  toESPHandle = osThreadCreate(osThread(toESP), NULL);
+	/* USER CODE BEGIN RTOS_THREADS */
 	/* add threads, ... */
-  /* USER CODE END RTOS_THREADS */
+	/* USER CODE END RTOS_THREADS */
 
 }
 
@@ -283,46 +296,19 @@ void MX_FREERTOS_Init(void) {
  * @retval None
  */
 /* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void const * argument)
-{
-  /* USER CODE BEGIN StartDefaultTask */
+void StartDefaultTask(void const *argument) {
+	/* USER CODE BEGIN StartDefaultTask */
 	uint32_t time_until;
 	uint8_t time_sample = 10;
-	bool isCalib = false;
 
 	uint8_t index = 0;
 
-	//-----------------------------
-	//targetPoint = newPoint(10.88316, 106.78117);
-//	route[0] = newPoint(10.88316, 106.78117);
-//	route[1] = newPoint(10.88342, 106.78149);
-//	route[2] = newPoint(10.88368, 106.78179);
-//	route[3] = newPoint(10.88328, 106.78214);
-
-	route[0] = newPoint(10.88518, 106.78053);
-	route[1] = newPoint(10.88525, 106.78047);
-	route[2] = newPoint(10.8853, 106.78039);
-	route[3] = newPoint(10.88534, 106.78023);
-	route[4] = newPoint(10.88531, 106.78007);
-	route[5] = newPoint(10.88524, 106.77995);
-	route[6] = newPoint(10.88513, 106.77987);
-	route[7] = newPoint(10.88498, 106.77982);
-	route[8] = newPoint(10.88489, 106.77981);
-	route[9] = newPoint(10.8848, 106.77982);
-	route[10] = newPoint(10.88473, 106.77986);
-
-//	route[0] = newPoint(10.88353,106.78017);
-//	route[1] = newPoint(10.8834,106.78003);
-//	route[2] = newPoint(10.88376,106.77974);
-
-	targetPoint = route[index];
+	DirectionData *temp = DirectionDataList_Get(&list);
+	targetPoint = newPoint(temp->lat, temp->lon);
+	free(temp);
 
 	/* Infinite loop */
 	while (1) {
-		if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1) == GPIO_PIN_RESET) {
-			speed += 10;
-			HAL_Delay(210);
-		}
 		if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET) {
 			break;
 		}
@@ -331,45 +317,51 @@ void StartDefaultTask(void const * argument)
 #if 1
 	resetTimer();
 	while (1) {
-		if (getTimer5ms() < 500 && !isCalib) {
+		if (getTimer5ms() < 800 && !isCalib) {
 			if (calib(322, headingDegrees, 0, 0, 0)) {
 				isCalib = true;
 			}
 		} else {
 			isCalib = true;
+			speed_run_pid(0, 0, 0, 0);
 		}
-		if (isCalib) {
-			if (distance <= 3) {
-				speed_run_pid(-127, -127, -127, -127);
-				index++;
-				if (index < 11) {
-					targetPoint = route[index];
-				}
-				osDelay(1500);
-			} else if (distance <= 10) {
-				run_following_heading(bearing, yaw_gyro_deg, 50, 0, 15);
+		if (isCalib && (!vatCan)) {
+			if (isDone) {
+				speed_run_pid(0, 0, 0, 0);
 			} else {
-				run_following_heading(bearing, yaw_gyro_deg, speed, 0, 15);
+				if (distance <= 5) {
+					speed_run_pid(15, 15, 15, 15);
+					if (list.count == 1) {
+						isDone = true;
+						break;
+					} else if (list.count > 1) {
+						DirectionData *temp = DirectionDataList_Get(&list);
+						targetPoint = newPoint(temp->lat, temp->lon);
+						free(temp);
+					}
+					osDelay(1300);
+				} else if (distance <= 10) {
+					run_following_heading(bearing, yaw_gyro_deg, 30, 0, 5);
+				} else {
+					run_following_heading(bearing, yaw_gyro_deg, 40, 0, 5);
+				}
+			}
+
+		} else {
+			if (disR >= 3 && disR <= disOK + 5) {
+				run_shift_left(0, 0, 30, 7);
+			}if (disL >= 3 && disL <= disOK + 5) {
+				run_shift_right(0, 0, 30, 7);
 			}
 		}
 		osDelay(1);
 	}
 #endif
 	for (;;) {
-		if (distance <= 5) {
-			pidFL._setPoint = 50;
-			pidFR._setPoint = -50;
-			pidBL._setPoint = 50;
-			pidBR._setPoint = -50;
-		} else if (distance <= 15) {
-			run_following_heading(0, yaw_gyro_deg * 2, speed * 0.7, base_diff,
-					15);
-		} else {
-			run_following_heading(0, yaw_gyro_deg * 2, speed, base_diff, 15);
-		}
+		speed_run_pid(0, 0, 0, 0);
 		osDelayUntil(&time_until, time_sample);
 	}
-  /* USER CODE END StartDefaultTask */
+	/* USER CODE END StartDefaultTask */
 }
 
 /* USER CODE BEGIN Header_StartLcdTask */
@@ -379,9 +371,8 @@ void StartDefaultTask(void const * argument)
  * @retval None
  */
 /* USER CODE END Header_StartLcdTask */
-void StartLcdTask(void const * argument)
-{
-  /* USER CODE BEGIN StartLcdTask */
+void StartLcdTask(void const *argument) {
+	/* USER CODE BEGIN StartLcdTask */
 	uint32_t time_until;
 	uint8_t time_sample = 10;
 
@@ -420,7 +411,7 @@ void StartLcdTask(void const * argument)
 		osDelayUntil(&time_until, time_sample);
 
 	}
-  /* USER CODE END StartLcdTask */
+	/* USER CODE END StartLcdTask */
 }
 
 /* USER CODE BEGIN Header_StartUartGPS */
@@ -430,9 +421,8 @@ void StartLcdTask(void const * argument)
  * @retval None
  */
 /* USER CODE END Header_StartUartGPS */
-void StartUartGPS(void const * argument)
-{
-  /* USER CODE BEGIN StartUartGPS */
+void StartUartGPS(void const *argument) {
+	/* USER CODE BEGIN StartUartGPS */
 	uint8_t cnt = 0;
 	HAL_UART_Receive_IT(&huart4, &C, 1);
 	/* Infinite loop */
@@ -450,7 +440,7 @@ void StartUartGPS(void const * argument)
 		}
 		HAL_UART_Receive_IT(&huart4, &C, 1);
 	}
-  /* USER CODE END StartUartGPS */
+	/* USER CODE END StartUartGPS */
 }
 
 /* USER CODE BEGIN Header_StartGpsTask */
@@ -460,9 +450,8 @@ void StartUartGPS(void const * argument)
  * @retval None
  */
 /* USER CODE END Header_StartGpsTask */
-void StartGpsTask(void const * argument)
-{
-  /* USER CODE BEGIN StartGpsTask */
+void StartGpsTask(void const *argument) {
+	/* USER CODE BEGIN StartGpsTask */
 	char tempStr[100];
 	checkGPS = 0;
 	/* Infinite loop */
@@ -479,11 +468,10 @@ void StartGpsTask(void const * argument)
 			currentPos = newPoint(realLat, realLon);
 			distance = calDistance(currentPos, targetPoint);
 			bearing = calBearing(currentPos, targetPoint);
-			osThreadResume(toESPHandle);
 		}
 		osDelay(1);
 	}
-  /* USER CODE END StartGpsTask */
+	/* USER CODE END StartGpsTask */
 }
 
 /* USER CODE BEGIN Header_StartMPUTask */
@@ -493,9 +481,8 @@ void StartGpsTask(void const * argument)
  * @retval None
  */
 /* USER CODE END Header_StartMPUTask */
-void StartMPUTask(void const * argument)
-{
-  /* USER CODE BEGIN StartMPUTask */
+void StartMPUTask(void const *argument) {
+	/* USER CODE BEGIN StartMPUTask */
 	uint32_t time_until;
 	uint8_t time_sample = 5;
 
@@ -511,9 +498,6 @@ void StartMPUTask(void const * argument)
 	setMeasurementMode(HMC5883L_IDLE); //HMC5883L_CONTINOUS
 	setDataRate(HMC5883L_DATARATE_75HZ);
 	setSamples(HMC5883L_SAMPLES_8);
-
-//	MyKalman kalmanY = newKalman(0.001, 0.003, 0.03);
-//	MyKalman kalmanX = newKalman(0.001, 0.003, 0.03);
 
 	MyKalman kalmanY = newKalman(0.001, 0.003, 0.03);
 	MyKalman kalmanX = newKalman(0.001, 0.003, 0.03);
@@ -589,9 +573,60 @@ void StartMPUTask(void const * argument)
 		}
 		cntTimer5ms++;
 		yaw_gyro_deg = gyro_deg[2];
+		checkMPU++;
+		if (isCalib) {
+			if ((disR > disOK || disR < 3) && (disL > disOK || disL < 3)) {
+				vatCan = false;
+//				if (isDone) {
+//					speed_run_pid(0, 0, 0, 0);
+//				} else {
+//					if (distance <= 5) {
+//						speed_run_pid(15, 15, 15, 15);
+//						if (list.count == 1) {
+//							isDone = true;
+//							break;
+//						} else if (list.count > 1) {
+//							DirectionData *temp = DirectionDataList_Get(&list);
+//							targetPoint = newPoint(temp->lat, temp->lon);
+//							free(temp);
+//						}
+//						osDelay(1300);
+//					} else if (distance <= 10) {
+//						run_following_heading(bearing, yaw_gyro_deg, 30, 0, 15);
+//					} else {
+//						run_following_heading(bearing, yaw_gyro_deg, 40, 0, 15);
+//					}
+//				}
+			} else {
+				vatCan = true;
+			}
+//			while (vatCan) {
+//				if ((disR > disOK + 10 || disR < 3)
+//						&& (disL > disOK + 10 || disL < 3)) {
+//					vatCan = false;
+//					break;
+//				} else {
+//					if (disR >= 3 && disR <= disOK + 10) {
+////						run_shift_left(0, 0, 30, 7);
+//						speed_run(FRONT_LEFT, -600);
+//						speed_run(FRONT_RIGHT, 600);
+//						speed_run(BACK_LEFT, 600);
+//						speed_run(BACK_RIGHT, -600);
+//					}
+//					if (disL >= 3 && disL <= disOK + 10) {
+////						run_shift_right(0, 0, 30, 7);
+//						speed_run(FRONT_LEFT, 600);
+//						speed_run(FRONT_RIGHT, -600);
+//						speed_run(BACK_LEFT, -600);
+//						speed_run(BACK_RIGHT, 600);
+//					}
+//				}
+//				osDelay(1);
+//			}
+		}
 		osDelayUntil(&time_until, time_sample);
 	}
-  /* USER CODE END StartMPUTask */
+	/* USER CODE END StartMPUTask */
 }
 
 /* USER CODE BEGIN Header_StartUartESP */
@@ -601,9 +636,8 @@ void StartMPUTask(void const * argument)
  * @retval None
  */
 /* USER CODE END Header_StartUartESP */
-void StartUartESP(void const * argument)
-{
-  /* USER CODE BEGIN StartUartESP */
+void StartUartESP(void const *argument) {
+	/* USER CODE BEGIN StartUartESP */
 	uint8_t cnt = 0;
 	debug = 0;
 	HAL_UART_Receive_IT(&huart5, &Ce, 1);
@@ -630,7 +664,7 @@ void StartUartESP(void const * argument)
 		}
 		HAL_UART_Receive_IT(&huart5, &Ce, 1);
 	}
-  /* USER CODE END StartUartESP */
+	/* USER CODE END StartUartESP */
 }
 
 /* USER CODE BEGIN Header_StartMotorTask */
@@ -640,11 +674,10 @@ void StartUartESP(void const * argument)
  * @retval None
  */
 /* USER CODE END Header_StartMotorTask */
-void StartMotorTask(void const * argument)
-{
-  /* USER CODE BEGIN StartMotorTask */
+void StartMotorTask(void const *argument) {
+	/* USER CODE BEGIN StartMotorTask */
 	uint32_t time_until;
-	uint8_t time_sample = 15;
+	uint8_t time_sample = 6;
 	/* init PID */
 	pidFL = newPID(0.3, 0, 20); //2 0 10
 	pidFR = newPID(0.3, 0, 20);
@@ -654,6 +687,7 @@ void StartMotorTask(void const * argument)
 	uint8_t l_cntT = 0;
 	/* Infinite loop */
 	for (;;) {
+		checkMTask++;
 		/* each 15ms */
 		l_cntT++;
 
@@ -713,7 +747,7 @@ void StartMotorTask(void const * argument)
 		}
 		osDelayUntil(&time_until, time_sample);
 	}
-  /* USER CODE END StartMotorTask */
+	/* USER CODE END StartMotorTask */
 }
 
 /* USER CODE BEGIN Header_StartToESP */
@@ -723,9 +757,8 @@ void StartMotorTask(void const * argument)
  * @retval None
  */
 /* USER CODE END Header_StartToESP */
-void StartToESP(void const * argument)
-{
-  /* USER CODE BEGIN StartToESP */
+void StartToESP(void const *argument) {
+	/* USER CODE BEGIN StartToESP */
 	checkESP = 0;
 	/* Infinite loop */
 	for (;;) {
@@ -734,7 +767,7 @@ void StartToESP(void const * argument)
 		UART_Print(&huart5, dataSend);
 		osDelay(1);
 	}
-  /* USER CODE END StartToESP */
+	/* USER CODE END StartToESP */
 }
 
 /* Private application code --------------------------------------------------*/
@@ -784,7 +817,6 @@ bool getCoordinates(char rawStr[], double *pLat, double *pLon) {
 	}
 	return false;
 }
-
 
 void resetArray(char pArr[], uint8_t length) {
 	for (int i = 0; i < length; i++) {

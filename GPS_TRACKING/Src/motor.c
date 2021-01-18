@@ -1,14 +1,15 @@
 #include "motor.h"
+#include <stdlib.h>
 
 int32_t enc_FL = 0;
 short l_enc_FL = 0; /* encoder value at now */
 short l_pre_enc_FL = 0; /* encoder value at 1s ago */
 int16_t l_cnt_FL = 0; /* revs of the value range */
 //---------
-//int32_t enc_FR = 0;
+int32_t enc_FR = 0;
 short l_enc_FR = 0; /* encoder value at now */
-//short l_pre_enc_FR = 0; /* encoder value at 1s ago */
-//int16_t l_cnt_FR = 0; /* revs of the value range */
+short l_pre_enc_FR = 0; /* encoder value at 1s ago */
+int16_t l_cnt_FR = 0; /* revs of the value range */
 //---------
 int32_t enc_BL = 0;
 short l_enc_BL = 0; /* encoder value at now */
@@ -26,6 +27,10 @@ PID pidBL;
 PID pidBR;
 
 extern int8_t leftRight;
+extern uint8_t disL;
+extern uint8_t disF;
+extern uint8_t disR;
+extern uint8_t disOK;
 
 uint8_t running_type;
 
@@ -138,7 +143,7 @@ void speed_run_pid(int8_t speedFL, int8_t speedFR, int8_t speedBL,
 bool calib(int16_t target, int16_t actual, int16_t speed, int8_t base_diff,
 		uint8_t diff_speed) {
 	int16_t opposite;
-	uint8_t speed_cua = 30;
+	uint8_t speed_cua = 20;
 	if (abs(actual - target) > 5) {
 		if (0 <= target && target <= 180) {
 			opposite = target + 180;
@@ -172,40 +177,36 @@ void run_following_heading(int16_t target, int16_t actual, int16_t speed,
 		int8_t base_diff, uint8_t diff_speed) {
 	running_type = RUN_STRAIGHT;
 	int16_t opposite;
-	uint8_t speed_cua = 60;
+	uint8_t speed_cua = 30;
 	if (abs(actual - target) >= 7) {
 		if (0 <= target && target <= 180) {
 			opposite = target + 180;
 			if (target < actual && actual <= opposite) {
 				// turn left
-				speed_run_pid(-0.2 * speed_cua, speed_cua, -0.2 * speed_cua,
-						speed_cua);
+				speed_run_pid(-speed_cua, speed_cua, -speed_cua, speed_cua);
 			} else {
 				//turn right
-				speed_run_pid(speed_cua, -0.2 * speed_cua, speed_cua,
-						-0.2 * speed_cua);
+				speed_run_pid(speed_cua, -speed_cua, speed_cua, -speed_cua);
 			}
 		} else {
 			// >180
 			opposite = target - 180;
 			if (opposite < actual && actual <= target) {
 				//turn right
-				speed_run_pid(speed_cua, -0.2 * speed_cua, speed_cua,
-						-0.2 * speed_cua);
+				speed_run_pid(speed_cua, -speed_cua, speed_cua, -speed_cua);
 			} else {
 				// turn left
-				speed_run_pid(-0.2 * speed_cua, speed_cua, -0.2 * speed_cua,
-						speed_cua);
+				speed_run_pid(-speed_cua, speed_cua, -speed_cua, speed_cua);
 			}
 		}
 
 	} else {
-		if (actual - target >= 1.5 / 2) {
+		if (actual - target >= 0.7) {
 			pidFL._setPoint = speed - diff_speed;
 			pidFR._setPoint = speed + diff_speed;
 			pidBL._setPoint = speed - diff_speed;
 			pidBR._setPoint = speed + diff_speed;
-		} else if (actual - target <= -2.5 / 2) {
+		} else if (actual - target <= -0.7) {
 			pidFL._setPoint = speed + diff_speed;
 			pidFR._setPoint = speed - diff_speed;
 			pidBL._setPoint = speed + diff_speed;
@@ -215,22 +216,6 @@ void run_following_heading(int16_t target, int16_t actual, int16_t speed,
 			pidFR._setPoint = speed;
 			pidBL._setPoint = speed;
 			pidBR._setPoint = speed;
-		}
-		if (actual - target >= 1.5 / 2) {
-			pidFL._setPoint = speed - diff_speed;
-			pidFR._setPoint = speed + diff_speed;
-			pidBL._setPoint = speed - diff_speed;
-			pidBR._setPoint = speed + diff_speed;
-		} else if (actual - target <= -2.5 / 2) {
-			pidFL._setPoint = speed + diff_speed;
-			pidFR._setPoint = speed - diff_speed;
-			pidBL._setPoint = speed + diff_speed;
-			pidBR._setPoint = speed - diff_speed;
-		} else {
-			pidFL._setPoint = speed;
-			pidFR._setPoint = speed + base_diff;
-			pidBL._setPoint = speed;
-			pidBR._setPoint = speed + base_diff;
 		}
 	}
 }
@@ -272,7 +257,7 @@ void run_shift_right(int16_t target, int16_t actual, int16_t speed,
 		pidFL._setPoint = speed;
 		pidFR._setPoint = -speed;
 		pidBL._setPoint = -speed;
-		pidBR._setPoint = speed + diff_speed;
+		pidBR._setPoint = speed;
 	}
 }
 

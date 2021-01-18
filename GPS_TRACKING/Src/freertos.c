@@ -122,11 +122,25 @@ int8_t base_diff = 30;
 Point targetPoint;
 Point currentPos;
 
-Point route[15];
 float distance;
 float bearing;
 uint16_t cntVatCan = 0;
 bool vatCan = false;
+
+char disStr[15];
+uint8_t iDis;
+uint8_t disL;
+uint8_t disF;
+uint8_t disR;
+uint8_t disOK;
+
+bool isTimerReset = false;
+
+uint32_t checkMotor = 0;
+uint32_t checkMPU = 0;
+uint32_t checkMTask = 0;
+bool isCalib = false;
+int8_t isLe = 0;		//-1:left	0:none	1:right
 
 extern DirectionDataList list;
 
@@ -148,9 +162,7 @@ osThreadId lcdTaskHandle;
 osThreadId uartGPSHandle;
 osThreadId gpsTaskHandle;
 osThreadId mpuTaskHandle;
-osThreadId uartESPHandle;
 osThreadId motorTaskHandle;
-osThreadId toESPHandle;
 osMutexId gpsDataMutexHandle;
 osSemaphoreId gpsDataSemHandle;
 
@@ -168,9 +180,7 @@ void StartLcdTask(void const *argument);
 void StartUartGPS(void const *argument);
 void StartGpsTask(void const *argument);
 void StartMPUTask(void const *argument);
-void StartUartESP(void const *argument);
 void StartMotorTask(void const *argument);
-void StartToESP(void const *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -184,8 +194,6 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName);
 /* USER CODE BEGIN 4 */
 __weak void vApplicationStackOverflowHook(xTaskHandle xTask,
 		signed char *pcTaskName) {
-	//char *taskName = malloc(20*sizeof(char));
-	//strcpy(taskName, pcTaskName);
 	isOverFlow = true;
 	/* Run time stack overflow checking is performed if
 	 configCHECK_FOR_STACK_OVERFLOW is defined to 1 or 2. This hook function is
@@ -259,19 +267,13 @@ void MX_FREERTOS_Init(void) {
 	gpsTaskHandle = osThreadCreate(osThread(gpsTask), NULL);
 
 	/* definition and creation of mpuTask */
-	osThreadDef(mpuTask, StartMPUTask, osPriorityHigh, 0, 250);
+	osThreadDef(mpuTask, StartMPUTask, osPriorityHigh, 0, 300);
 	mpuTaskHandle = osThreadCreate(osThread(mpuTask), NULL);
 
-	/* definition and creation of uartESP */
-//  osThreadDef(uartESP, StartUartESP, osPriorityIdle, 0, 200);
-//  uartESPHandle = osThreadCreate(osThread(uartESP), NULL);
 	/* definition and creation of motorTask */
 	osThreadDef(motorTask, StartMotorTask, osPriorityIdle, 0, 128);
 	motorTaskHandle = osThreadCreate(osThread(motorTask), NULL);
 
-	/* definition and creation of toESP */
-//  osThreadDef(toESP, StartToESP, osPriorityNormal, 0, 128);
-//  toESPHandle = osThreadCreate(osThread(toESP), NULL);
 	/* USER CODE BEGIN RTOS_THREADS */
 	/* add threads, ... */
 	/* USER CODE END RTOS_THREADS */
@@ -289,7 +291,6 @@ void StartDefaultTask(void const *argument) {
 	/* USER CODE BEGIN StartDefaultTask */
 	uint32_t time_until;
 	uint8_t time_sample = 10;
-	bool isCalib = false;
 
 	uint8_t index = 0;
 
@@ -313,30 +314,39 @@ void StartDefaultTask(void const *argument) {
 			}
 		} else {
 			isCalib = true;
+			speed_run_pid(0, 0, 0, 0);
 		}
 		if (isCalib) {
-			if (isDone) {
-				speed_run_pid(0, 0, 0, 0);
+			if (0) {
+				run_shift_right(bearing, yaw_gyro_deg, 60, 0);
+			} else if (0) {
+				run_shift_left(bearing, yaw_gyro_deg, 60, 0);
 			} else {
-				if (distance <= 5) {
-					speed_run_pid(30, 30, 30, 30);
-					if (list.count == 1) {
-						isDone = true;
-						break;
-					} else if (list.count > 1) {
-						DirectionData *temp = DirectionDataList_Get(&list);
-						targetPoint = newPoint(temp->lat, temp->lon);
-						free(temp);
-					}
-					osDelay(1300);
-				} else if (distance <= 10) {
-					run_following_heading(bearing, yaw_gyro_deg, 60, 0, 15);
+				isTimerReset = false;
+				if (isDone) {
+					speed_run_pid(0, 0, 0, 0);
 				} else {
-					run_following_heading(bearing, yaw_gyro_deg, 100, 0, 15);
+					if (distance <= 4) {
+						speed_run_pid(10, 10, 10, 10);
+						if (list.count == 1) {
+							isDone = true;
+							break;
+						} else if (list.count > 1) {
+							DirectionData *temp = DirectionDataList_Get(&list);
+							targetPoint = newPoint(temp->lat, temp->lon);
+							free(temp);
+						}
+						osDelay(1300);
+					} else if (distance <= 10) {
+						run_following_heading(bearing, yaw_gyro_deg, 30, 0, 5);
+					} else {
+						run_following_heading(bearing, yaw_gyro_deg, 60, 0, 5);
+					}
 				}
 			}
 
 		}
+		checkMotor++;
 		osDelay(1);
 	}
 #endif
@@ -451,6 +461,7 @@ void StartGpsTask(void const *argument) {
 			currentPos = newPoint(realLat, realLon);
 			distance = calDistance(currentPos, targetPoint);
 			bearing = calBearing(currentPos, targetPoint);
+			UART_Print(&huart5, dataSend);
 		}
 		osDelay(1);
 	}
@@ -482,9 +493,6 @@ void StartMPUTask(void const *argument) {
 	setDataRate(HMC5883L_DATARATE_75HZ);
 	setSamples(HMC5883L_SAMPLES_8);
 
-//	MyKalman kalmanY = newKalman(0.001, 0.003, 0.03);
-//	MyKalman kalmanX = newKalman(0.001, 0.003, 0.03);
-
 	MyKalman kalmanY = newKalman(0.001, 0.003, 0.03);
 	MyKalman kalmanX = newKalman(0.001, 0.003, 0.03);
 	/* Infinite loop */
@@ -498,9 +506,9 @@ void StartMPUTask(void const *argument) {
 //				gyro_deg[i] -= gyro_result[i] * time_sample / 995;
 //			}*/
 //		}
-		if (gyro_result[2] > 1) {
+		if (gyro_result[2] > 0.8) {
 			gyro_deg[2] -= gyro_result[2] * time_sample / 1003;
-		} else if (gyro_result[2] < -1) {
+		} else if (gyro_result[2] < -0.8) {
 			gyro_deg[2] -= gyro_result[2] * time_sample / 985;
 		}
 		if (gyro_deg[2] >= 360) {
@@ -559,47 +567,10 @@ void StartMPUTask(void const *argument) {
 		}
 		cntTimer5ms++;
 		yaw_gyro_deg = gyro_deg[2];
+		checkMPU++;
 		osDelayUntil(&time_until, time_sample);
 	}
 	/* USER CODE END StartMPUTask */
-}
-
-/* USER CODE BEGIN Header_StartUartESP */
-/**
- * @brief Function implementing the uartESP thread.
- * @param argument: Not used
- * @retval None
- */
-/* USER CODE END Header_StartUartESP */
-void StartUartESP(void const *argument) {
-	/* USER CODE BEGIN StartUartESP */
-	uint8_t cnt = 0;
-	debug = 0;
-	HAL_UART_Receive_IT(&huart5, &Ce, 1);
-	/* Infinite loop */
-	for (;;) {
-		osThreadSuspend(uartESPHandle);
-		if (debug == 0) {
-			resetArray(espData, strlen(espData));
-//			if (Ce == 'R') {
-//				osThreadSuspend(defaultTaskHandle);
-//				osThreadSuspend(lcdTaskHandle);
-//				osThreadSuspend(uartGPSHandle);
-//				osThreadSuspend(gpsTaskHandle);
-//				osThreadSuspend(mpuTaskHandle);
-////				osThreadSuspend(uartESPHandle);
-//				osThreadSuspend(motorTaskHandle);
-//				osThreadSuspend(toESPHandle);
-//			}
-		}
-		espData[debug++] = Ce;
-		if (espData[debug - 1] == '\n') {
-			debug = 0;
-			//resetArray(espData, strlen(espData));
-		}
-		HAL_UART_Receive_IT(&huart5, &Ce, 1);
-	}
-	/* USER CODE END StartUartESP */
 }
 
 /* USER CODE BEGIN Header_StartMotorTask */
@@ -612,7 +583,7 @@ void StartUartESP(void const *argument) {
 void StartMotorTask(void const *argument) {
 	/* USER CODE BEGIN StartMotorTask */
 	uint32_t time_until;
-	uint8_t time_sample = 15;
+	uint8_t time_sample = 6;
 	/* init PID */
 	pidFL = newPID(0.3, 0, 20); //2 0 10
 	pidFR = newPID(0.3, 0, 20);
@@ -622,6 +593,7 @@ void StartMotorTask(void const *argument) {
 	uint8_t l_cntT = 0;
 	/* Infinite loop */
 	for (;;) {
+		checkMTask++;
 		/* each 15ms */
 		l_cntT++;
 
@@ -682,26 +654,6 @@ void StartMotorTask(void const *argument) {
 		osDelayUntil(&time_until, time_sample);
 	}
 	/* USER CODE END StartMotorTask */
-}
-
-/* USER CODE BEGIN Header_StartToESP */
-/**
- * @brief Function implementing the toESP thread.
- * @param argument: Not used
- * @retval None
- */
-/* USER CODE END Header_StartToESP */
-void StartToESP(void const *argument) {
-	/* USER CODE BEGIN StartToESP */
-	checkESP = 0;
-	/* Infinite loop */
-	for (;;) {
-		osThreadSuspend(toESPHandle);
-		checkESP++;
-		UART_Print(&huart5, dataSend);
-		osDelay(1);
-	}
-	/* USER CODE END StartToESP */
 }
 
 /* Private application code --------------------------------------------------*/

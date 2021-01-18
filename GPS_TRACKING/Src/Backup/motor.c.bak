@@ -26,6 +26,12 @@ PID pidBL;
 PID pidBR;
 
 extern int8_t leftRight;
+extern uint8_t disL;
+extern uint8_t disF;
+extern uint8_t disR;
+extern uint8_t disOK;
+
+extern uint32_t checkMotor;
 
 uint8_t running_type;
 
@@ -138,7 +144,7 @@ void speed_run_pid(int8_t speedFL, int8_t speedFR, int8_t speedBL,
 bool calib(int16_t target, int16_t actual, int16_t speed, int8_t base_diff,
 		uint8_t diff_speed) {
 	int16_t opposite;
-	uint8_t speed_cua = 30;
+	uint8_t speed_cua = 20;
 	if (abs(actual - target) > 5) {
 		if (0 <= target && target <= 180) {
 			opposite = target + 180;
@@ -172,62 +178,77 @@ void run_following_heading(int16_t target, int16_t actual, int16_t speed,
 		int8_t base_diff, uint8_t diff_speed) {
 	running_type = RUN_STRAIGHT;
 	int16_t opposite;
-	uint8_t speed_cua = 30;
+	uint8_t speed_cua = 20;
+	checkMotor++;
 	if (abs(actual - target) >= 7) {
 		if (0 <= target && target <= 180) {
 			opposite = target + 180;
 			if (target < actual && actual <= opposite) {
 				// turn left
-				speed_run_pid(-0.6 * speed_cua, speed_cua, -5, 0.6 * speed_cua);
+				speed_run_pid(-0.2 * speed_cua, speed_cua, -0.2 * speed_cua,
+						speed_cua);
 			} else {
 				//turn right
-				speed_run_pid(speed_cua, -0.9 * speed_cua, 0.6 * speed_cua, -5);
+				speed_run_pid(speed_cua, -0.2 * speed_cua, speed_cua,
+						-0.2 * speed_cua);
 			}
 		} else {
 			// >180
 			opposite = target - 180;
 			if (opposite < actual && actual <= target) {
 				//turn right
-				speed_run_pid(speed_cua, -0.9 * speed_cua, 0.6 * speed_cua, -5);
+				speed_run_pid(speed_cua, -0.2 * speed_cua, speed_cua,
+						-0.2 * speed_cua);
 			} else {
 				// turn left
-				speed_run_pid(-0.6 * speed_cua, speed_cua, -5, 0.6 * speed_cua);
+				speed_run_pid(-0.2 * speed_cua, speed_cua, -0.2 * speed_cua,
+						speed_cua);
 			}
 		}
 
 	} else {
-		if (actual - target >= 1.5/2) {
-			pidFL._setPoint = speed - diff_speed;
-			pidFR._setPoint = speed + diff_speed;
-			pidBL._setPoint = speed - diff_speed;
-			pidBR._setPoint = speed + diff_speed;
-		} else if (actual - target <= -2.5/2) {
-			pidFL._setPoint = speed + diff_speed;
-			pidFR._setPoint = speed - diff_speed;
-			pidBL._setPoint = speed + diff_speed;
-			pidBR._setPoint = speed - diff_speed;
+//		if (actual - target >= 1.5 / 2) {
+//			pidFL._setPoint = speed - diff_speed;
+//			pidFR._setPoint = speed + diff_speed;
+//			pidBL._setPoint = speed - diff_speed;
+//			pidBR._setPoint = speed + diff_speed;
+//		} else if (actual - target <= -2.5 / 2) {
+//			pidFL._setPoint = speed + diff_speed;
+//			pidFR._setPoint = speed - diff_speed;
+//			pidBL._setPoint = speed + diff_speed;
+//			pidBR._setPoint = speed - diff_speed;
+//		} else {
+//			pidFL._setPoint = speed;
+//			pidFR._setPoint = speed;
+//			pidBL._setPoint = speed;
+//			pidBR._setPoint = speed;
+//		}
+		if ((disR > disOK || disR < 3) && (disL > disOK || disL < 3)) {
+			if (actual - target >= 1.5 / 2) {
+				pidFL._setPoint = speed - diff_speed;
+				pidFR._setPoint = speed + diff_speed;
+				pidBL._setPoint = speed - diff_speed;
+				pidBR._setPoint = speed + diff_speed;
+			} else if (actual - target <= -2.5 / 2) {
+				pidFL._setPoint = speed + diff_speed;
+				pidFR._setPoint = speed - diff_speed;
+				pidBL._setPoint = speed + diff_speed;
+				pidBR._setPoint = speed - diff_speed;
+			} else {
+				pidFL._setPoint = speed;
+				pidFR._setPoint = speed + base_diff;
+				pidBL._setPoint = speed;
+				pidBR._setPoint = speed + base_diff;
+			}
 		} else {
-			pidFL._setPoint = speed;
-			pidFR._setPoint = speed;
-			pidBL._setPoint = speed;
-			pidBR._setPoint = speed;
+			if (disR >= 3 && disR <= disOK) {
+				run_shift_left(target, actual, speed_cua, diff_speed);
+			}
+			if (disL >= 3 && disL <= disOK) {
+				run_shift_right(target, actual, speed_cua, diff_speed);
+			}
 		}
-		if (actual - target >= 1.5 / 2) {
-			pidFL._setPoint = speed - diff_speed;
-			pidFR._setPoint = speed + diff_speed;
-			pidBL._setPoint = speed - diff_speed;
-			pidBR._setPoint = speed + diff_speed;
-		} else if (actual - target <= -2.5 / 2) {
-			pidFL._setPoint = speed + diff_speed;
-			pidFR._setPoint = speed - diff_speed;
-			pidBL._setPoint = speed + diff_speed;
-			pidBR._setPoint = speed - diff_speed;
-		} else {
-			pidFL._setPoint = speed;
-			pidFR._setPoint = speed + base_diff;
-			pidBL._setPoint = speed;
-			pidBR._setPoint = speed + base_diff;
-		}
+
 	}
 }
 void run_shift_left(int16_t target, int16_t actual, int16_t speed,
@@ -250,6 +271,7 @@ void run_shift_left(int16_t target, int16_t actual, int16_t speed,
 		pidBL._setPoint = speed;
 		pidBR._setPoint = -speed;
 	}
+
 }
 void run_shift_right(int16_t target, int16_t actual, int16_t speed,
 		uint8_t diff_speed) {

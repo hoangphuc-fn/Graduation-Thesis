@@ -35,6 +35,7 @@
 #include <stdbool.h>
 #include "DirectionData.h"
 #include "utils.h"
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -79,6 +80,8 @@ char lcdLine0[15];
 char lcdLine1[15];
 extern Point targetPoint;
 extern Point currentPos;
+
+extern uint8_t disOK;
 
 DirectionDataList list;
 
@@ -160,11 +163,13 @@ int main(void) {
 	delay_init();
 	ST7920_Init();
 	ST7920_Clear();
-	ST7920_SendString(0, 0, "Initializing...");
+	ST7920_SendString(0, 0, "Initializing");
+
+	disOK = 40;
+//	route = true;
 	/* USER CODE END 2 */
 
 	/* Call init function for freertos objects (in freertos.c) */
-//	route = true;
 //	MX_FREERTOS_Init();
 	/* Start scheduler */
 //	osKernelStart();
@@ -184,6 +189,18 @@ int main(void) {
 					strcpy(tempStr, gpsData);
 					resetArray(gpsData, strlen(gpsData));
 					sprintf(lcdLine1, "health check:%d", (int) check++);
+					if (checkGPS == 0) {
+						if (check % 4 == 0) {
+							sprintf(lcdLine0, "Initializing   ");
+						} else if (check % 4 == 1) {
+							sprintf(lcdLine0, "Initializing.  ");
+						} else if (check % 4 == 2) {
+							sprintf(lcdLine0, "Initializing.. ");
+						} else {
+							sprintf(lcdLine0, "Initializing...");
+						}
+					}
+					ST7920_SendString(0, 0, lcdLine0);
 					ST7920_SendString(1, 0, lcdLine1);
 					if (getCoordinates(tempStr, &realLat, &realLon)) {
 
@@ -222,10 +239,9 @@ int main(void) {
 			}
 		}
 
-		if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1) == GPIO_PIN_RESET) {
-			DirectionData *temp = DirectionDataList_Get(&list);
-			targetPoint = newPoint(temp->lat, temp->lon);
-			HAL_Delay(400);
+		if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET) {
+			disOK -= 5;
+			HAL_Delay(300);
 		}
 
 	}
